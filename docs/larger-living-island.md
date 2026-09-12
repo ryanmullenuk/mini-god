@@ -1,0 +1,11 @@
+# Larger living island
+
+The new generated island has 7,938.7 square world units of dry land versus 1,982.1 before: approximately four times the area (+300%). The world extent doubles from 116 to 232, while the terrain grid grows from 200 to 400 samples per side to preserve 0.58-unit sculpting resolution. The twenty thin layers, single-layer strokes and one-layer walking clearance remain unchanged.
+
+Broad lowland grass terraces, higher green hills, exposed rocky mountain terraces, an eastern sandy coast, three enlarged pools and patterned groves give the island distinct regions. Decorative trees, flowers and upland rocks use five instanced batches, stay on dry terrain and clear space around camp, resource nodes and buildings. These are scenery, separate from harvestable resource nodes. Birds, clouds and roaming animal spawn ranges cover the larger landscape. Animal and villager model sizes remain unchanged.
+
+The first Add islanders action is now Choose settlement. It starts the existing click/tap guidance flow with a green/red camp preview. A valid camp needs flat fertile ground and four clear approaches. Clicking places the camp and invites two followers, generates nearby reachable resources and discovers building opportunities. Further invitations use that camp; it cannot be relocated accidentally. Escape cancels the placement tool.
+
+Save format 6 supports the larger bounds. Legacy 200×200 terrain is embedded exactly in the centre of the new grid, surrounded by sea, keeping all world coordinates, buildings, villagers, supplies, terrain edits and original pools intact. Existing islands are NOT replaced by the generated landscape. Help → New larger island creates the redesigned map and uses the existing previous-island backup/restore flow. Export provides an independent backup. Formats 1–5 remain importable.
+
+Validation: automated coverage of multiple widely separated starting clearings, supplies, farm opportunities, repeated settlement rejection, submerged rejection, extended save bounds, exact legacy terrain migration and scenery clearing, plus the existing terrain, simulation, guidance, temple and animal regression suites. No hands-on browser visual/performance QA was requested or performed.
