@@ -7,8 +7,8 @@ export function oceanCameraFit(halfHeight:number,pitch:number){
   const distance=Math.max(130,halfHeight/Math.tan(pitch)+180);
   return {distance,far:distance+halfHeight/Math.tan(pitch)+1200};
 }
-export function createOcean(terrain:Terrain){
-  const shoreline=new Shoreline(terrain);
+export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
+  const shoreline=new Shoreline(terrain,undefined,createShoreWorker);
   const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{
     shoreMap:{value:shoreline.texture},time:{value:0},heightMap:{value:terrain.texture},extent:{value:EXTENT},sea:{value:SEA},
     viewDirection:{value:new THREE.Vector3(.2,.73,.65).normalize()},sunDirection:{value:new THREE.Vector3(-50,80,30).normalize()},

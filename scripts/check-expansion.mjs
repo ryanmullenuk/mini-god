@@ -445,3 +445,17 @@ test('version 18 compact terrain preserves layers, upgrades v17 and caches uncha
   assert.equal(encodeTerrain(new Float32Array(next.terrain)),payload.terrain,'Repeated saves do not drift');
  }finally{t.dispose();}
 });
+
+test('ocean shelf worker keeps the previous field and discards obsolete coastlines',()=>{
+ const t=new Terrain(),requests=[],worker={postMessage(m){requests.push(m);},terminate(){this.ended=true;}};
+ const shore=new Shoreline(t,true,()=>worker);
+ try{
+  assert.equal(requests.length,1);assert.equal(shore.distances[0],1000);
+  t.texture.needsUpdate=true;shore.update();
+  const result=(id,value)=>({data:{id,distances:new Float32Array(GRID*GRID).fill(value),shelfDepths:new Float32Array(GRID*GRID).fill(.5),sea:new Uint8Array(GRID*GRID).fill(1)}});
+  worker.onmessage(result(requests[0].id,99));assert.equal(requests.length,2);assert.equal(shore.distances[0],1000);
+  worker.onmessage(result(requests[1].id,3));assert.equal(shore.distances[0],3);assert.ok(shore.isOceanCell(0));
+  const version=shore.texture.version;shore.update();assert.equal(shore.texture.version,version);
+  shore.dispose();assert.ok(worker.ended);
+ }finally{shore.dispose();t.dispose();}
+});

@@ -28,8 +28,8 @@ export class Settlement {
   private needDiscovery=true;
   private orderMessages=new Map<number,string>();
 
-  constructor(readonly terrain:Terrain,state?:WorldState){
-    this.state=state??newWorld();this.metadata=new TerrainMetadata(terrain);
+  constructor(readonly terrain:Terrain,state?:WorldState,createWaterWorker?:()=>Worker){
+    this.state=state??newWorld();this.metadata=new TerrainMetadata(terrain,undefined,createWaterWorker);
     this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='farm'&&p.valid&&Math.abs(x-p.x)<1.32&&Math.abs(z-p.z)<1.32));
     this.foodSystem=new FoodSystem(()=>this.state,terrain,this.nav,(w,k,id,p)=>this.assign(w,k,id,p),w=>this.release(w));
   }

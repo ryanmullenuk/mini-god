@@ -19,3 +19,98 @@ A local CPU benchmark of a sample edit near (-4, 3) measured the previous full r
 All 104 automated checks passed, including full/partial geometry equality, unchanged mesh retention, tall-cliff interpolation, queued edit coalescing, cancellation and fallback. Type checking and production build passed. The emitted worker asset was executed in a separate Node worker using a browser-message adapter and successfully returned transferable typed buffers. No browser visual or frame-rate profiling was performed.
 
 Initial world generation, undo/import's synchronous full rebuild, save serialization and some scenery work still run on the main thread. If noticeable stalls remain, those are the next profiling targets; moving hosts is not a substitute for that work.
+
+## September 13: input, water metadata and saves
+
+Applied in the requested order, with the complete existing check suite after
+ each stage (121 checks after picking/input, 124 after water metadata and live
+ simulation, 125 after saves, 126 after the additional shoreline regression).
+
+1. Replaced mesh raycasts with a height-field march. Rays keep their orthographic
+   origins, clip to terrain bounds, step by half a terrain cell and refine crossings
+   12 times. Sea-plane and stroke-plane fallbacks are retained. No layers or terrain
+   geometry were removed.
+2. Kept the previous contributor's frame-coalesced hover and extended it to dragged
+   guidance. Release/cancel/multitouch clear queued input; clicks still resolve at
+   their actual release position.
+3. Stamps advance a water revision only when samples cross the sea threshold.
+   Water-distance floods run in a worker and coalesce edits. Obsolete results are
+   rejected. Worker failure uses yielding two-millisecond scheduling slices.
+   While a map is pending, moisture estimates use the last completed map (initially
+   unknown/infinite distance); terrain height, submersion and navigation remain live.
+   Undo/import and touch rollback invalidate the relevant revisions.
+4. Only the Pause control stops settlement, islander and animal updates. Stroke-end
+   reconciliation still revalidates sites/resources, releases claims and recovers
+   stranded settlers without losing their carried goods.
+5. Version 18 stores explicit little-endian Int16 heights at scale 1000 in base64.
+   Rounding is clamped to each sample's original terrace. Versions 1–17 retain their
+   historical numeric-array decoding and migration paths. The encoder caches the
+   terrain payload by array identity and edit revision. The world is always fresh.
+   Quantization changes scalar heights by at most approximately 0.001; it is not a
+   bit-identical Float32 export. Repeated saves are stable and sampled layer indices
+   are preserved. Historical migration fixtures now explicitly create array saves.
+6. Profiled scenery before changing its scheduling. The measured stroke cost
+   wildlife 0.3 ms, landscape <0.1 ms and land animals <0.1 ms. These calls remain
+   together because they were not a significant blocker in this workload.
+
+The CPU profiler identified an additional full-grid ocean shoreline refresh. It
+now uses a separate worker with transferred distance/shelf/mask buffers and rejects
+obsolete results. Its initial field is open sea until the first result arrives;
+subsequent updates retain the previous completed field. A visual-worker failure
+retains the existing synchronous fallback on later terrain changes.
+
+Browser verification also exposed invalid `file:///ROOT` worker URLs in the local
+Vinext build. The engine now injects Vite `?worker` constructors for geometry,
+water metadata and shoreline work. All three workers were observed running in the
+final browser trace. Keeping the worker boundary in the engine allows existing
+Node tests to use their synchronous/deterministic factories.
+
+### Measurements and reproducibility
+
+Same local 400×400 map; geometry stayed at 55 meshes / 885,780 vertices:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Full geometry rebuild | 617 ms | 504 ms |
+| Affected-section rebuild | 7 ms | 7 ms |
+| Numeric-array save | — | 6.67 ms / 2,006,714 bytes |
+| Compact cold save | — | 8.14 ms / 427,292 bytes |
+| Compact cached save | — | 0.16 ms / 427,292 bytes |
+
+Geometry timings vary between runs (another final run measured 499 / 5 ms); this
+pass does not claim geometry speedups. Compact cold encoding was slower than the
+numeric baseline on this machine, although the payload is 4.7 times smaller and
+cached terrain saves are substantially cheaper. These are local samples, not
+portable timing guarantees.
+
+Chrome headless, 1280×800, real WebGL, CPU profiler recording, two live followers,
+one stroke, with profiler startup excluded from the frame window:
+
+| Phase | Frames | Maximum gap | p95 |
+|---|---:|---:|---:|
+| Hover | 62 | 16.8 ms | 16.7 ms |
+| Press | 1 | 16.6 ms | 16.6 ms |
+| Drag | 75 | 16.8 ms | 16.8 ms |
+| Release + 1.5 seconds | 91 | 16.8 ms | 16.8 ms |
+
+No page errors or main-thread long tasks (>50 ms) were recorded; Undo was enabled,
+confirming an actual terrain edit. Simulation advanced 1.3 seconds during drag,
+with two followers and paused=false. Before the worker-loading fix, occasional
+33.3 ms drag/release gaps and main-thread shoreline flood samples remained.
+
+The test display is 60 Hz: normal frame spacing is 16.67 ms. The literal requested
+"all gaps under 16 ms" criterion is therefore **not met**; this run instead shows
+no missed refreshes during the measured interaction. It does not establish the
+same result for 30 followers, every coastline, every camera view or slower devices.
+Initial world creation, undo/import and worker-unavailable geometry/shoreline paths
+can still do synchronous work.
+
+Run the CPU benchmark with `node scripts/benchmark-sculpt.mjs`. The browser harness
+is `scripts/profile-sculpt-browser.mjs`; it records phase timings, actual scenery
+method costs, worker URLs, simulation progress, page errors and a Chrome CPU profile.
+Install its optional local dependency with
+`npm install --prefix work/browser-qa --no-audit --no-fund --ignore-scripts playwright`.
+Run a local preview on port 3011, then set `BROWSER_EXECUTABLE` to an installed Chrome
+binary and run `node scripts/profile-sculpt-browser.mjs`. `PROFILE_URL` overrides
+the preview URL; the first positional argument selects the JSON output path.
+The harness uses a fresh isolated browser context and does not touch player saves.

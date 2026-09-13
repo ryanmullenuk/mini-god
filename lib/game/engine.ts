@@ -1,3 +1,6 @@
+import GeometryWorker from './terrain-worker?worker';
+import WaterWorker from './water-distance-worker?worker';
+import ShoreWorker from './shoreline-worker?worker';
 import { pickTerrain } from './terrain-picking';
 import { TerrainMesher } from './terrain-mesher';
 import { MarineLife } from './marine-life';
@@ -41,10 +44,10 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
    saveNotice=!saveAllowed?'Island restored. Upgrade backup unavailable; export a copy to keep new progress.':saved.archipelagoUpgraded?'Your mainland now has more open settlement ground':migrated?'Saved island upgraded to 20 layers':'Saved island restored';
   }
  }catch{saveAllowed=false;saveNotice='Saved data could not load. Import a copy or start a new island.';}
- let simulation=new Settlement(terrain,savedWorld);if(migrated)simulation.terrainChanged();
+ let simulation=new Settlement(terrain,savedWorld,()=>new WaterWorker());if(migrated)simulation.terrainChanged();
  let villageView=new SettlementView(terrain);scene.add(villageView.group);
  const guidanceCursor=new GuidanceCursor(terrain);scene.add(guidanceCursor.group);
- const ocean=createOcean(terrain);scene.add(ocean.mesh);const marine=new MarineLife(terrain,ocean.shoreline);scene.add(marine.group);
+ const ocean=createOcean(terrain,()=>new ShoreWorker());scene.add(ocean.mesh);const marine=new MarineLife(terrain,ocean.shoreline);scene.add(marine.group);
  const islanders=new Islanders(terrain);scene.add(islanders.group);
  const foodView=new FoodView(terrain);scene.add(foodView.group);
  const landscape=new Landscape(terrain);scene.add(landscape.group);
@@ -69,7 +72,7 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  function changeAt(p:THREE.Vector3,strength:number){if(!stroke)return;const waterRevision=terrain.waterRevision;if(terrain.applyStroke(stroke,p.x,p.z,settings.brush,strength)){if(terrain.waterRevision!==waterRevision)simulation.metadata.invalidate();dirty=true;strokeChanged=true;}}
  function paint(x:number,y:number,initial=false){const p=pick(x,y,true);if(!p)return;showBrush(p);if(lastStampPoint){const d=p.distanceTo(lastStampPoint),steps=Math.max(1,Math.min(256,Math.ceil(d/Math.min(.45,settings.brush*.18))));for(let i=1;i<=steps;i++)changeAt(lastStampPoint.clone().lerp(p,i/steps),.20);}else changeAt(p,initial?.7:.20);lastStampPoint=p;lastPaint=performance.now();}
  let sceneryPending=false;
- const mesher=new TerrainMesher(terrain,()=>{sceneryPending=true;renderer.shadowMap.needsUpdate=true;});
+ const mesher=new TerrainMesher(terrain,()=>{sceneryPending=true;renderer.shadowMap.needsUpdate=true;},()=>new GeometryWorker());
  function refreshScenery(){if(!sceneryPending||sculpting||mesher.busy)return;wildlife.terrainChanged();landscape.terrainChanged();landAnimals.terrainChanged();sceneryPending=false;}
  function rebuild(){if(!dirty)return;mesher.request();dirty=false;}
  function finishStroke(){if(sculpting){rebuild();if(strokeChanged&&strokeSnapshot){simulation.terrainChanged(false);villageView.terrainChanged();history.push(strokeSnapshot);if(history.length>35)history.shift();onHistory(history.length);}}sculpting=false;strokeSnapshot=null;stroke=null;strokeChanged=false;lastStampPoint=null;touchPending=false;}
@@ -129,7 +132,7 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  function replaceWorld(saved?:IslandSave){
   pendingGuidance=null;hideGuidance();finishStroke();mesher.cancel();backup();
   if(saved)terrain.values.set(saved.terrain);else{const original=new Terrain();terrain.values.set(original.values);original.dispose();}
-  terrain.rebuild();mesher.syncBaseline();simulation.metadata.dispose();simulation=new Settlement(terrain,saved?.world);if(saved?.migratedFrom||saved?.archipelagoUpgraded)simulation.terrainChanged();islanders.clear();wildlife.terrainChanged();landscape.terrainChanged();scene.remove(landAnimals.group);landAnimals.dispose();landAnimals=new LandAnimals(terrain,(x,z)=>simulation.state.plots.some(p=>p.valid&&Math.abs(x-p.x)<1.5&&Math.abs(z-p.z)<1.5));scene.add(landAnimals.group);
+  terrain.rebuild();mesher.syncBaseline();simulation.metadata.dispose();simulation=new Settlement(terrain,saved?.world,()=>new WaterWorker());if(saved?.migratedFrom||saved?.archipelagoUpgraded)simulation.terrainChanged();islanders.clear();wildlife.terrainChanged();landscape.terrainChanged();scene.remove(landAnimals.group);landAnimals.dispose();landAnimals=new LandAnimals(terrain,(x,z)=>simulation.state.plots.some(p=>p.valid&&Math.abs(x-p.x)<1.5&&Math.abs(z-p.z)<1.5));scene.add(landAnimals.group);
   scene.remove(villageView.group);villageView.dispose();villageView=new SettlementView(terrain);scene.add(villageView.group);
   history.length=0;onHistory(0);saveAllowed=true;saveNow();
  }
