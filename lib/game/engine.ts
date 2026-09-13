@@ -1,3 +1,4 @@
+import { pickTerrain } from './terrain-picking';
 import { TerrainMesher } from './terrain-mesher';
 import { MarineLife } from './marine-life';
 import * as THREE from 'three';
@@ -55,7 +56,7 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  const history:Float32Array[]=[];let stroke:SculptStroke|null=null;
  let placement:GuidancePreview|null=null,pendingGuidance:{kind:GuidanceKind;pointer:number}|null=null,previewKey='',previewTime=0;
  function makeRay(x:number,y:number){const r=canvas.getBoundingClientRect();ndc.set((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);}
- function pick(x:number,y:number,flat=false){makeRay(x,y);if(!flat){const hit=ray.intersectObjects(terrain.group.children,false)[0];if(hit)return hit.point.clone();}plane.constant=-(flat?strokeY:SEA);return ray.ray.intersectPlane(plane,hitPoint)?.clone()??null;}
+ function pick(x:number,y:number,flat=false){makeRay(x,y);if(!flat){const hit=pickTerrain(ray.ray,terrain,camera.far);if(hit)return hit;}plane.constant=-(flat?strokeY:SEA);return ray.ray.intersectPlane(plane,hitPoint)?.clone()??null;}
  function showBrush(p:THREE.Vector3|null){brush.visible=!!p&&sculptTool(settings.tool)&&pointers.size<2;if(p){brush.position.set(p.x,Math.max(terrain.height(p.x,p.z)+.09,SEA+.06),p.z);brush.scale.setScalar(settings.brush);ringMaterial.color.set(settings.tool==='lower'?'#ffe7bb':settings.tool==='path'?'#fff8cc':'#f3ffe8');}}
  function hideGuidance(){guidanceCursor.show(null);placement=null;previewKey='';}
  function showGuidance(p:THREE.Vector3|null,kind:GuidanceKind|null=guideKind(settings.tool)){

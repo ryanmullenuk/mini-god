@@ -7,7 +7,7 @@ import ts from 'typescript';
 import * as THREE from 'three';
 mkdirSync('work',{recursive:true});const temp=mkdtempSync(resolve('work/performance-tests-'));
 after(()=>rmSync(temp,{recursive:true,force:true}));
-for(const name of ['terrain','navigation','islanders']){
+for(const name of ['terrain','navigation','islanders','terrain-picking']){
  const source=readFileSync(`lib/game/${name}.ts`,'utf8');
  writeFileSync(resolve(temp,`${name}.mjs`),ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace(/from ['"]\.\/([a-z-]+)['"]/g,"from './$1.mjs'"));
 }
@@ -61,4 +61,15 @@ test('terrain bounds preserve exact ray hits across a sculpted chunk replacement
   for(const mesh of terrain.group.children)mesh.geometry.boundingBox=null;
   assert.deepEqual(ray.intersectObjects(terrain.group.children).map(h=>h.distance),bounded);assert.ok(bounded.length);
  }finally{terrain.dispose();}
+});
+
+const {pickTerrain}=await import(pathToFileURL(resolve(temp,'terrain-picking.mjs')));
+test('heightmap picking handles orthographic rays, risers and empty sea without meshes',()=>{
+ let reads=0;const terrain={height(x){reads++;return x<0?1:3;}};
+ const vertical=new THREE.Ray(new THREE.Vector3(-2,300,0),new THREE.Vector3(0,-1,0));
+ const hit=pickTerrain(vertical,terrain,2000);assert.ok(Math.abs(hit.y-1)<.001);assert.equal(hit.x,-2);assert.ok(reads<50,'Empty sky is clipped');
+ const cliff=pickTerrain(new THREE.Ray(new THREE.Vector3(-4,2,0),new THREE.Vector3(1,0,0)),terrain,100);
+ assert.ok(Math.abs(cliff.x)<.001);assert.equal(cliff.y,2);
+ reads=0;assert.equal(pickTerrain(new THREE.Ray(new THREE.Vector3(300,30,0),new THREE.Vector3(0,-1,0)),terrain,2000),null);assert.equal(reads,0);
+ assert.equal(pickTerrain(vertical,terrain,10),null);
 });
