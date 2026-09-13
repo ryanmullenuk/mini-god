@@ -1,4 +1,4 @@
-import { EXTENT, GRID, STEP, SEA, desertWeight, layerY, type Terrain } from './terrain';
+import { EXTENT, GRID, STEP, SEA, desertWeight, layerY, scalarLevel, Terrain } from './terrain';
 import { walkingClearance } from './navigation';
 
 export type PlotKind = 'home' | 'farm';
@@ -50,22 +50,9 @@ function inBounds(x: number, z: number) {
     gx >= 0 && gz >= 0 && gx < GRID - 1 && gz < GRID - 1;
 }
 
-/**
- * Derived, disposable gameplay facts. Never modifies heights, meshes or agents.
- * Call invalidate after sculpting or replacing heights, including undo/rollback.
- * Water distances are computed lazily; unused metadata costs no per-frame scan.
- */
-export class TerrainMetadata {
-  private waterDistances: Float32Array | undefined;
-
-  constructor(private readonly terrain: Pick<Terrain, 'level'>) {}
-
-  invalidate() {
-    this.waterDistances = undefined;
-  }
-
-  private distances() {
-    if (this.waterDistances) return this.waterDistances;
+const NEIGHBOURS = [[1,0],[-1,0],[0,1],[0,-1]] as const;
+/** Yielding version also provides a bounded fallback when Workers are unavailable. */
+export function* waterDistanceSteps(terrain: Pick<Terrain, 'level'>): Generator<void, Float32Array> {
     const distances = new Float32Array(GRID * GRID).fill(Infinity);
     const queue = new Int32Array(GRID * GRID);
     let head = 0, tail = 0;
@@ -75,17 +62,19 @@ export class TerrainMetadata {
         // outside Terrain.sample and mistaking its -2 sentinel for seawater.
         const x = Math.max(MIN + 1e-9, (i + .5) * STEP - EXTENT / 2);
         const z = Math.max(MIN + 1e-9, (j + .5) * STEP - EXTENT / 2);
-        if (layerY(this.terrain.level(x, z)) <= SEA) {
+        if (layerY(terrain.level(x, z)) <= SEA) {
           const k = j * GRID + i;
           distances[k] = 0;
           queue[tail++] = k;
         }
       }
+      if(j%8===0)yield;
     }
     // Multi-source breadth-first distance. Invalid border samples are not water.
     while (head < tail) {
+      if(head%2048===0)yield;
       const k = queue[head++], i = k % GRID, j = Math.floor(k / GRID);
-      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (const [di, dj] of NEIGHBOURS) {
         const ni = i + di, nj = j + dj;
         if (ni < 0 || nj < 0 || ni >= GRID - 1 || nj >= GRID - 1) continue;
         const n = nj * GRID + ni;
@@ -94,9 +83,76 @@ export class TerrainMetadata {
         queue[tail++] = n;
       }
     }
-    this.waterDistances = distances;
     return distances;
+}
+
+/**
+ * Derived, disposable gameplay facts. Never modifies heights, meshes or agents.
+ * Call invalidate after sculpting or replacing heights, including undo/rollback.
+ * Water distances are computed lazily; unused metadata costs no per-frame scan.
+ */
+export class TerrainMetadata {
+  private waterDistances: Float32Array | undefined;
+  private revision = -1;
+  private generation = 0;
+  private active = false;
+  private disposed = false;
+  private worker: Worker | null = null;
+  private fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly background: boolean;
+
+  constructor(private readonly terrain: Pick<Terrain, 'level'> & Partial<Pick<Terrain, 'values' | 'waterRevision'>>,
+    background = typeof window !== 'undefined',
+    createWorker = () => new Worker(new URL('./water-distance-worker.ts', import.meta.url), {type:'module'})) {
+    this.background = background && !!terrain.values;
+    if(this.background){
+      this.waterDistances = new Float32Array(GRID*GRID).fill(Infinity);
+      try {this.worker=createWorker();this.worker.onmessage=e=>this.complete(e.data.id,e.data.distances);
+        this.worker.onerror=()=>{this.worker?.terminate();this.worker=null;this.active=false;this.start();};
+      } catch {this.worker=null;}
+      this.invalidate();
+    }
   }
+
+  invalidate() {
+    this.revision=this.terrain.waterRevision??0;
+    this.generation++;
+    if(this.background)this.start();else this.waterDistances=undefined;
+  }
+
+  private complete(id:number, distances:Float32Array) {
+    if(this.disposed)return;
+    this.active=false;
+    if(id===this.generation)this.waterDistances=distances;
+    else this.start(); // Discard obsolete coastlines; coalesce intermediate edits.
+  }
+
+  private start(){
+    if(this.disposed||this.active||!this.terrain.values)return;
+    this.active=true;
+    const id=this.generation,values=this.terrain.values.slice();
+    if(this.worker){this.worker.postMessage({id,values},[values.buffer]);return;}
+    // Worker failure must not turn a coastline edit back into a synchronous flood.
+    const snapshot={level:(x:number,z:number)=>scalarLevel(Terrain.prototype.sample.call({values} as Terrain,x,z))};
+    const steps=waterDistanceSteps(snapshot);
+    const run=()=>{
+      if(this.disposed)return;
+      if(id!==this.generation){this.active=false;this.start();return;}
+      const until=performance.now()+2;
+      do {const result=steps.next();if(result.done){this.complete(id,result.value);return;}} while(performance.now()<until);
+      this.fallbackTimer=setTimeout(run,0);
+    };
+    this.fallbackTimer=setTimeout(run,0);
+  }
+
+  private distances() {
+    if(this.revision!==(this.terrain.waterRevision??0))this.invalidate();
+    if(this.waterDistances)return this.waterDistances;
+    const steps=waterDistanceSteps(this.terrain);
+    for(;;){const result=steps.next();if(result.done){this.waterDistances=result.value;return result.value;}}
+  }
+
+  dispose(){this.disposed=true;this.worker?.terminate();clearTimeout(this.fallbackTimer);}
 
   inspect(x: number, z: number): TerrainFacts | null {
     if (!inBounds(x, z)) return null;

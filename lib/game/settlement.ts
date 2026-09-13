@@ -241,8 +241,8 @@ export class Settlement {
     for(const n of this.state.resources)if(n.claimedBy===w.id)n.claimedBy=null;
     w.job=null;w.moving=false;
   }
-  terrainChanged(){
-    this.metadata.invalidate();this.nav.invalidate();
+  terrainChanged(waterChanged=true){
+    if(waterChanged)this.metadata.invalidate();this.nav.invalidate();
     for(const p of this.state.plots)p.valid=this.physicalPlot(p,p.kind);
     for(const n of this.state.resources)n.valid=this.terrain.level(n.x,n.z)>=FIRST_DRY_LAYER&&this.nav.safe(n.x,n.z);
     this.nav.invalidate();

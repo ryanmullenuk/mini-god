@@ -123,3 +123,41 @@ test('sculpt and restoration refresh water, elevation and suitability without ch
     assert.deepEqual(terrain.values, saved);
   } finally { terrain.dispose(); }
 });
+
+test('inland stamps retain water cache; only sea crossings advance the water revision',()=>{
+ const t=new Terrain();try{
+  t.values.fill(6.25);const dry=t.beginStroke(0,0,'raise'),revision=t.waterRevision;
+  assert.ok(t.applyStroke(dry,0,0,3,.7));assert.equal(t.waterRevision,revision);
+  t.values.fill(3.25);const coast=t.beginStroke(0,0,'raise');
+  assert.ok(t.applyStroke(coast,0,0,3,.7));assert.ok(t.waterRevision>revision);
+ }finally{t.dispose();}
+});
+
+test('background water maps coalesce edits, reject stale results and never flood during inspect',()=>{
+ const t=new Terrain();const messages=[];
+ const worker={postMessage(m){messages.push(m);},terminate(){this.terminated=true;}};
+ const metadata=new TerrainMetadata(t,true,()=>worker);
+ try{
+  assert.equal(messages.length,1);const first=messages[0];
+  metadata.invalidate();metadata.invalidate();
+  const f=metadata.inspect(0,0);assert.ok(f);assert.equal(messages.length,1);
+  worker.onmessage({data:{id:first.id,distances:new Float32Array(400*400).fill(99)}});
+  assert.equal(messages.length,2);assert.notEqual(metadata.inspect(0,0).waterDistance,99);
+  worker.onmessage({data:{id:messages[1].id,distances:new Float32Array(400*400).fill(7)}});
+  assert.equal(metadata.inspect(0,0).waterDistance,7);
+  metadata.dispose();assert.ok(worker.terminated);
+ }finally{metadata.dispose();t.dispose();}
+});
+
+test('yielding fallback produces the same water distances as synchronous metadata',async()=>{
+ const {waterDistanceSteps}=await import(pathToFileURL(resolve(temp,'terrain-metadata.mjs')));
+ const terrain={level(x,z){return x<0&&z<0?5:9;}};
+ const steps=waterDistanceSteps(terrain);let result,count=0;
+ do{result=steps.next();count++;}while(!result.done);
+ assert.ok(count>10,'Flood can be scheduled in bounded slices');
+ const metadata=new TerrainMetadata(terrain);
+ for(const [x,z] of [[2,3],[7,-1],[-5,-5]]){
+  const i=Math.floor((x+EXTENT/2)/STEP),j=Math.floor((z+EXTENT/2)/STEP);
+  assert.equal(metadata.inspect(x,z).waterDistance,result.value[j*400+i]);
+ }
+});

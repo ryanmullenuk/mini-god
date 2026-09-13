@@ -356,6 +356,8 @@ export function softContour(r:number[][]){
 let initialTerrainChunks:TerrainChunkData[]|undefined;
 export class Terrain {
   values=new Float32Array(GRID*GRID);
+  revision=0;
+  waterRevision=0;
   group=new THREE.Group();
   private sections=new Map<number,Map<number,TerrainChunkData>>();
   texture:THREE.DataTexture;
@@ -385,7 +387,7 @@ export class Terrain {
   }
   applyStroke(stroke:SculptStroke,x:number,z:number,radius:number,strength:number){
     if(![x,z,radius,strength].every(Number.isFinite)||radius<=0||strength<=0||stroke.targetLevel< -1||stroke.targetLevel>=LAYER_COUNT||stroke.sourceLevel>=LAYER_COUNT)return false;
-    let changed=false;
+    let changed=false,waterChanged=false;
     const imin=Math.max(1,Math.floor((x-radius+EXTENT/2)/STEP)),imax=Math.min(GRID-2,Math.ceil((x+radius+EXTENT/2)/STEP)),jmin=Math.max(1,Math.floor((z-radius+EXTENT/2)/STEP)),jmax=Math.min(GRID-2,Math.ceil((z+radius+EXTENT/2)/STEP));
     for(let j=jmin;j<=jmax;j++)for(let i=imin;i<=imax;i++){
       const d=Math.hypot((i+.5)*STEP-EXTENT/2-x,(j+.5)*STEP-EXTENT/2-z)/radius;if(d>=1)continue;
@@ -398,13 +400,17 @@ export class Terrain {
       // Bound scalar displacement too: bilinear points between samples must
       // obey the same one-layer limit as the editable samples themselves.
       const after=stroke.mode==='raise'?Math.min(target,original+LAYER_INTERVAL,before+strength*falloff):Math.max(target,original-LAYER_INTERVAL,before-strength*falloff);
-      if(Math.abs(after-before)>.0001){this.values[k]=after;changed=true;}
+      if(Math.abs(after-before)>.0001){this.values[k]=after;changed=true;
+        if((layerY(scalarLevel(before))<=SEA)!==(layerY(scalarLevel(this.values[k]))<=SEA))waterChanged=true;}
     }
+    if(changed)this.revision++;
+    if(waterChanged)this.waterRevision++;
     return changed;
   }
   // A single dab is a complete stroke for callers without a pointer lifecycle.
   sculpt(x:number,z:number,radius:number,mode:SculptMode,strength:number){return this.applyStroke(this.beginStroke(x,z,mode),x,z,radius,strength);}
   rebuild(){
+    this.revision++;this.waterRevision++;
     for(const mesh of this.group.children as THREE.Mesh[])mesh.geometry.dispose();this.group.clear();this.sections.clear();
     this.installChunks(buildTerrainChunks(this.values));
   }
