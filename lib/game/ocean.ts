@@ -10,7 +10,7 @@ export function oceanCameraFit(halfHeight:number,pitch:number){
 export function createOcean(terrain:Terrain){
   const shoreline=new Shoreline(terrain);
   const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{
-    time:{value:0},heightMap:{value:terrain.texture},extent:{value:EXTENT},sea:{value:SEA},
+    shoreMap:{value:shoreline.texture},time:{value:0},heightMap:{value:terrain.texture},extent:{value:EXTENT},sea:{value:SEA},
     viewDirection:{value:new THREE.Vector3(.2,.73,.65).normalize()},sunDirection:{value:new THREE.Vector3(-50,80,30).normalize()},
     sunColour:{value:new THREE.Color(1,.88,.63)},sunStrength:{value:1},daylightTint:{value:new THREE.Color(1,1,1)},edgeFogColour:{value:new THREE.Color('#83a8b9')},
     contacts:{value:Array.from({length:32},()=>new THREE.Vector3())},contactCount:{value:0},
@@ -29,7 +29,7 @@ export function createOcean(terrain:Terrain){
     }
   `,fragmentShader:/* glsl */`
     precision highp float;
-    uniform float time,extent,sea,sunStrength;uniform sampler2D heightMap;
+    uniform float time,extent,sea,sunStrength;uniform sampler2D heightMap,shoreMap;
     uniform vec3 viewDirection,sunDirection,sunColour,daylightTint,edgeFogColour;
     uniform vec3 contacts[32];uniform int contactCount;
     varying vec3 world;
@@ -43,23 +43,38 @@ export function createOcean(terrain:Terrain){
       float level=floor((h-.5)/.5);
       float bottom=level<0.?-1.935:(level<6.?-1.635+level*.3:.165+(level-6.)*.28);
       float depth=mix(6.,max(0.,sea-bottom),inside);
+      // Submerged terraces can reach the finite simulation boundary. Round
+      // that shelf into open water before its clipped, straight edge is visible.
+      float margin=extent*.5-max(abs(p.x),abs(p.y));
+      float shelfEnd=1.-smoothstep(1.5,11.+noise(p*.10)*5.,margin);
+      depth=mix(depth,6.,shelfEnd*smoothstep(.2,.8,depth));
       vec3 colour=vec3(.30,.68,.65);
       colour=mix(colour,vec3(.065,.45,.44),smoothstep(.15,.18,depth));
       colour=mix(colour,vec3(.025,.28,.32),smoothstep(.45,.48,depth));
       colour=mix(colour,vec3(.012,.12,.17),smoothstep(.85,.89,depth));
       colour=mix(colour,vec3(.004,.020,.048),smoothstep(1.48,1.53,depth));
-      float broad=noise(p*.065+vec2(time*.008,-time*.005));
-      colour*=.985+.03*broad;
+      // Domain-warped swells have no shared grid or repeating crest spacing.
+      vec2 drift=vec2(time*.018,-time*.011);
+      vec2 warp=vec2(noise(p*.037+drift),noise(p*.043-drift+19.));
+      float broad=noise(p*.13+warp*2.4+drift);
+      float swell=sin(dot(p,vec2(.31,.19))+warp.x*5.+time*.31);
+      colour*=.96+.055*broad+.014*swell;
       // Broad painted light, not high-frequency specular or glitter.
-      vec3 normal=normalize(vec3(.025*cos(p.x*.055+time*.24),1.,.025*sin(p.y*.064-time*.19)));
+      vec3 normal=normalize(vec3(.055*cos(p.x*.055+warp.x*3.+time*.24),1.,.045*sin(p.y*.064+warp.y*3.-time*.19)));
       vec3 halfLight=normalize(sunDirection+viewDirection);
-      float glint=pow(max(0.,dot(normal,halfLight)),9.);
-      float lightPower=mix(.13,.24,sunStrength);
+      float glint=pow(max(0.,dot(normal,halfLight)),7.);
+      float lightPower=mix(.10,.20,sunStrength);
       colour*=daylightTint;
-      colour+=sunColour*glint*lightPower*(.7+.3*broad);
+      colour+=sunColour*glint*lightPower*(.85+.15*broad)*(.92+.08*swell);
       // The wave wash is tied to actual submerged height, including sculpted bays.
-      float breath=.65+.12*sin(time*.5+noise(p*.12)*4.);
-      float foam=(1.-smoothstep(.10,.40,depth))*inside*breath;
+      float shore=texture2D(shoreMap,clamp(uv,0.,1.)).r;
+      float phase=time*.34+noise(p*.09)*4.;
+      float breath=.48+.16*sin(phase);
+      // One slow advancing wash, broken up along the shore; no ocean-wide rings.
+      float wash=.35+.85*(.5+.5*sin(phase));
+      float breaker=(1.-smoothstep(.10,.38,abs(shore-wash)))
+        *(1.-smoothstep(1.3,2.,shore))*(.18+.20*broad);
+      float foam=((1.-smoothstep(.10,.40,depth))*breath+breaker)*inside;
       for(int i=0;i<32;i++){
         if(i>=contactCount)break;
         float edge=abs(length(p-contacts[i].xy)-contacts[i].z);
@@ -67,14 +82,17 @@ export function createOcean(terrain:Terrain){
       }
       foam*=.8+.2*noise(p*.75+vec2(time*.035,-time*.025));
       colour=mix(colour,vec3(.83,.95,.94)*daylightTint,clamp(foam,0.,.85));
-      float alpha=mix(.62,.995,smoothstep(.1,.9,depth));
+      float alpha=mix(.72,1.,smoothstep(.1,.9,depth));
       // Irregular mist blends into the sky before any finite mesh boundary.
       float radius=length(p/vec2(1.08,.98));
       float wisps=(noise(p*.024+vec2(time*.003,-time*.002))-.5)*18.;
-      float fog=smoothstep(112.,174.,radius+wisps);
+      // Keep all three offshore islands surrounded by water. The irregular
+      // horizon begins beyond the editable square, whose seabed is hidden
+      // by opaque deep water rather than a square fog mask.
+      float fog=smoothstep(150.,260.,radius+wisps);
       vec3 mist=mix(edgeFogColour,vec3(.77,.85,.87)*daylightTint,.16);
       colour=mix(colour,mist,fog);
-      alpha*=1.-smoothstep(165.,215.,radius+wisps);
+      alpha*=1.-smoothstep(245.,330.,radius+wisps);
       gl_FragColor=vec4(colour,alpha);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
