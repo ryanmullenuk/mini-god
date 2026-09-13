@@ -1,3 +1,4 @@
+import {legacySave} from './save-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {test,after} from 'node:test';
 import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
@@ -69,8 +70,8 @@ test('construction cargo survives terrain interruption and a save without duplic
 test('version 11 paid construction remains supplied without charging or replenishing old stock',()=>{
  const {terrain,sim}=setup();try{
   const p=plot(sim,'home');p.stage='building';p.progress=.5;sim.state.wood=0;
-  const old=JSON.parse(encodeSave(terrain.values,sim.state));old.version=11;
-  const saved=decodeSave(JSON.stringify(old));assert.equal(saved.version,17);assert.deepEqual(saved.world,sim.state);const restored=new Settlement(terrain,saved.world);restored.reserve=()=>{};run(restored,60);assert.equal(restored.state.plots[0].stage,'complete');assert.equal(restored.state.wood,0);
+  const old=JSON.parse(legacySave(terrain.values,sim.state));old.version=11;
+  const saved=decodeSave(JSON.stringify(old));assert.equal(saved.version,18);assert.deepEqual(saved.world,sim.state);const restored=new Settlement(terrain,saved.world);restored.reserve=()=>{};run(restored,60);assert.equal(restored.state.plots[0].stage,'complete');assert.equal(restored.state.wood,0);
  }finally{terrain.dispose();}
 });
 test('new building models have finite geometry and cottage details appear after upgrade',()=>{

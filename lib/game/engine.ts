@@ -14,7 +14,7 @@ import type { TerrainFacts, PlotKind, PlotBounds, PlotContext, PlotAssessment } 
 import { Settlement } from './settlement';
 import { SettlementView } from './settlement-view';
 import { GuidanceCursor } from './guidance-cursor';
-import { decodeSave, encodeSave, SAVE_KEY, type IslandSave } from './save';
+import { decodeSave, createSaveEncoder, SAVE_KEY, type IslandSave } from './save';
 import type { GuidanceKind, GuidancePreview, SettlementStatus, WorldState } from './world-state';
 export type Tool='guide-granary'|'guide-storehouse'|'fishing'|'trap'|'guide-coop'|'guide-pigpen'|'settle'|'move'|'raise'|'lower'|'path'|'guide-home'|'guide-farm'|'rally'|'guide-temple'|'guide-slaughterhouse'|'rain'|'bloom';
 const guideKind=(tool:Tool):GuidanceKind|null=>tool==='guide-granary'?'granary':tool==='guide-storehouse'?'storehouse':tool==='fishing'?'fishing':tool==='trap'?'trap':tool==='guide-coop'?'coop':tool==='guide-pigpen'?'pigpen':tool==='settle'?'settle':tool==='guide-home'?'home':tool==='guide-farm'?'farm':tool==='guide-temple'?'temple':tool==='guide-slaughterhouse'?'slaughterhouse':tool==='rally'?'rally':tool==='rain'?'rain':tool==='bloom'?'bloom':null;
@@ -29,6 +29,7 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  let yaw=.30,pitch=.82,view=host.clientWidth<600?116:98;
  const updateCamera=()=>{const a=host.clientWidth/host.clientHeight;const h=a<1?view/a:view;camera.left=-h*a;camera.right=h*a;camera.top=h;camera.bottom=-h;const fit=oceanCameraFit(h,pitch);camera.far=fit.far;camera.position.set(target.x+fit.distance*Math.sin(yaw)*Math.cos(pitch),target.y+fit.distance*Math.sin(pitch),target.z+fit.distance*Math.cos(yaw)*Math.cos(pitch));camera.lookAt(target);camera.updateProjectionMatrix();camera.updateMatrixWorld();};updateCamera();
  const ambient=new THREE.HemisphereLight('#d9f6ff','#92a372',1.2);scene.add(ambient);const sun=new THREE.DirectionalLight('#fff2d1',2.05);sun.position.set(-50,80,30);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-120,right:120,top:120,bottom:-120,near:1,far:220});sun.shadow.bias=-.0005;sun.shadow.normalBias=.035;sun.shadow.radius=3;scene.add(sun);const daylight=new Daylight(scene,sun,ambient);
+ const encodeSave=createSaveEncoder();
  const terrain=new Terrain();scene.add(terrain.group);
  let migrated=false,savedWorld:WorldState|undefined,saveAllowed=true,saveNotice='Autosave on this device';
  try{
@@ -123,8 +124,8 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  foodView.update(simulation.state);landscape.update(simulation.state,elapsed);landAnimals.sync(simulation.state.foodSystem.animals,dt*settings.speed,stopped);wildlife.managedFishing=simulation.state.foodSystem.fishing;ocean.update(elapsed,camera);if(skyPointer){makeRay(skyPointer.x,skyPointer.y);wildlife.setCursorRay(ray.ray,Math.max(1.5,view*.07));}wildlife.update(dt,settings.paused);marine.update(dt,settings.paused);renderer.render(scene,camera);
  };frame=requestAnimationFrame(draw);onReady();
  const resize=()=>{renderer.setSize(host.clientWidth,host.clientHeight);updateCamera();};const observer=new ResizeObserver(resize);observer.observe(host);
- function saveNow(){if(!saveAllowed)return;try{localStorage.setItem(SAVE_KEY,encodeSave(terrain.values,simulation.state));saveNotice='Saved on this device';}catch{saveNotice='Saving is unavailable. Export a copy to keep your island.';}}
- function backup(){try{localStorage.setItem(SAVE_KEY+'.previous',encodeSave(terrain.values,simulation.state));}catch{throw new Error('Device storage is full or unavailable. Export your island before replacing it.');}}
+ function saveNow(){if(!saveAllowed)return;try{localStorage.setItem(SAVE_KEY,encodeSave(terrain.values,simulation.state,terrain.revision));saveNotice='Saved on this device';}catch{saveNotice='Saving is unavailable. Export a copy to keep your island.';}}
+ function backup(){try{localStorage.setItem(SAVE_KEY+'.previous',encodeSave(terrain.values,simulation.state,terrain.revision));}catch{throw new Error('Device storage is full or unavailable. Export your island before replacing it.');}}
  function replaceWorld(saved?:IslandSave){
   pendingGuidance=null;hideGuidance();finishStroke();mesher.cancel();backup();
   if(saved)terrain.values.set(saved.terrain);else{const original=new Terrain();terrain.values.set(original.values);original.dispose();}
@@ -146,7 +147,7 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  cancelOrder(id){const ok=simulation.cancelOrder(id);if(ok){previewKey='';saveNow();}return ok;},
  focusGuidance(id){const p=simulation.state.orders.find(o=>o.id===id)??simulation.state.plots.find(o=>o.id===id)??simulation.state.foodSystem.fishing.find(a=>a.id===id)??simulation.state.foodSystem.traps.find(a=>a.id===id)??(simulation.state.beacon?.id===id?simulation.state.beacon:null);if(p){target.set(p.x,terrain.height(p.x,p.z),p.z);view=host.clientWidth<600?13:18;updateCamera();}},
  power(kind){if(settings.paused)return false;const ok=simulation.power(kind);if(ok)saveNow();return ok;},saveStatus:()=>saveNotice,
- exportSave(){finishStroke();return encodeSave(terrain.values,simulation.state);},
+ exportSave(){finishStroke();return encodeSave(terrain.values,simulation.state,terrain.revision);},
  importSave(raw){try{const saved=decodeSave(raw);replaceWorld(saved);return 'Your island has been restored.';}catch(e){return e instanceof Error?e.message:'The save could not be read.';}},
  resetWorld(){try{replaceWorld();return 'A new island is ready.';}catch(e){return e instanceof Error?e.message:'Your current island has been kept.';}},restorePrevious(){try{const raw=localStorage.getItem(SAVE_KEY+'.previous');if(!raw)return 'There is no previous island to restore.';replaceWorld(decodeSave(raw));return 'Your previous island has been restored.';}catch{return 'The previous island could not be restored.';}},
  hasPrevious(){try{return !!localStorage.getItem(SAVE_KEY+'.previous');}catch{return false;}},

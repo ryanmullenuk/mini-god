@@ -1,3 +1,4 @@
+import {legacySave} from './save-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {test,after} from 'node:test';
 import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
@@ -94,8 +95,8 @@ test('active worship, livestock and targeted rain saves resume without duplicate
 });
 test('version 4 villages retain guidance, cargo and buildings during the upgrade',()=>{
   const {terrain,sim}=flat();try{
-    sim.guide('home',{x:1,z:3});const data=JSON.parse(encodeSave(terrain.values,sim.state));data.version=4;delete data.world.tier;delete data.world.rainArea;
-    const upgraded=decodeSave(JSON.stringify(data));assert.equal(upgraded.version,17);assert.equal(upgraded.world.tier,1);assert.equal(upgraded.world.rainArea,null);
+    sim.guide('home',{x:1,z:3});const data=JSON.parse(legacySave(terrain.values,sim.state));data.version=4;delete data.world.tier;delete data.world.rainArea;
+    const upgraded=decodeSave(JSON.stringify(data));assert.equal(upgraded.version,18);assert.equal(upgraded.world.tier,1);assert.equal(upgraded.world.rainArea,null);
     assert.deepEqual(upgraded.world.orders,data.world.orders);assert.deepEqual(upgraded.world.settlers,data.world.settlers);
   }finally{terrain.dispose();}
 });

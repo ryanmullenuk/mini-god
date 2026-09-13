@@ -1,3 +1,4 @@
+import {legacySave} from './save-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {test,after} from 'node:test';
 import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
@@ -79,7 +80,7 @@ test('active beacon save resumes identically and older saves upgrade',()=>{
     sim.guide('rally',{x:5,z:3});run(sim,2);
     const raw=encodeSave(terrain.values,sim.state),saved=decodeSave(raw);restored.values.set(saved.terrain);
     const other=new Settlement(restored,saved.world);run(sim,25);run(other,25);assert.deepEqual(sim.state,other.state);
-    const older=JSON.parse(encodeSave(terrain.values,sim.state));older.version=3;delete older.world.beacon;
+    const older=JSON.parse(legacySave(terrain.values,sim.state));older.version=3;delete older.world.beacon;
     assert.equal(decodeSave(JSON.stringify(older)).world.beacon,null);
     for(const mutate of [s=>s.world.beacon.members[0].id=999,s=>s.world.beacon.members[0].destination.x=Infinity,s=>s.world.beacon.id=s.world.settlers[0].id,s=>s.world.beacon.members.push(s.world.beacon.members[0])]){
       const data=JSON.parse(raw);mutate(data);assert.throws(()=>decodeSave(JSON.stringify(data)));
@@ -126,7 +127,7 @@ test('farmers can be assigned, transferred and saved without duplicating field r
     assert.equal(sim.assignFarmer(farms[0].id,9999),false);
     const restored=decodeSave(encodeSave(terrain.values,sim.state));assert.equal(restored.world.plots.find(p=>p.id===farms[0].id).farmerId,worker.id);
     assert.ok(sim.assignFarmer(farms[0].id,null));assert.equal(farms[0].farmerId,null);
-    const data=JSON.parse(encodeSave(terrain.values,sim.state));data.world.plots.filter(p=>p.kind==='farm').forEach(p=>p.farmerId=worker.id);assert.throws(()=>decodeSave(JSON.stringify(data)));
+    const data=JSON.parse(legacySave(terrain.values,sim.state));data.world.plots.filter(p=>p.kind==='farm').forEach(p=>p.farmerId=worker.id);assert.throws(()=>decodeSave(JSON.stringify(data)));
   }finally{terrain.dispose();}
 });
 test('unreachable beacons expire and terrain damage releases beacon journeys safely',()=>{

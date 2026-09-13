@@ -50,7 +50,7 @@ test('saves resume work and cargo without duplicating materials or prayer reward
     const save=decodeSave(encodeSave(terrain.values,a.state));restoredTerrain.values.set(save.terrain);
     const b=new Settlement(restoredTerrain,save.world);
     run(a,200);run(b,200);assert.deepEqual(a.state,b.state);invariants(a);invariants(b);
-    assert.equal(encodeSave(terrain.values,a.state).includes('"version":17'),true);
+    assert.equal(encodeSave(terrain.values,a.state).includes('"version":18'),true);
   }finally{terrain.dispose();restoredTerrain.dispose();}
 });
 
@@ -92,7 +92,7 @@ test('invalid imports, duplicate claims and newer schemas fail before replacing 
     const save=JSON.parse(raw);save.version=99;assert.throws(()=>decodeSave(JSON.stringify(save)));
     assert.throws(()=>decodeSave('{bad json'));assert.throws(()=>decodeSave(raw.replace('"food":','"food":-1,"ignored":')));
     const duplicate=JSON.parse(raw);duplicate.world.settlers[1].id=duplicate.world.settlers[0].id;assert.throws(()=>decodeSave(JSON.stringify(duplicate)));
-    const missing=JSON.parse(raw);missing.terrain.pop();assert.throws(()=>decodeSave(JSON.stringify(missing)));
+    const missing=JSON.parse(raw);missing.terrain=missing.terrain.slice(0,-4);assert.throws(()=>decodeSave(JSON.stringify(missing)));
     assert.equal(sim.state.settlers.length,2);
   }finally{terrain.dispose();}
 });

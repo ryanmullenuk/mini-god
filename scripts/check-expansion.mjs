@@ -1,3 +1,5 @@
+import {assertTerrain} from './save-fixtures.mjs';
+import {legacySave} from './save-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {OrthographicCamera,Scene,DirectionalLight,HemisphereLight,Color,Ray,Vector3} from 'three';
 import {test,after} from 'node:test';
@@ -45,7 +47,7 @@ test('larger world retains sculpt resolution, varied land and multiple broad sta
 test('legacy terrain is embedded exactly, and new saves support distant settlements',()=>{
  const old=Array.from({length:40000},(_,i)=>i%2?7.25:6.25),world=newWorld();
  const restored=decodeSave(JSON.stringify({format:'tide-island',version:5,savedAt:'2026-09-09',terrain:old,world}));
- assert.equal(restored.version,17);assert.equal(restored.terrain.length,160000);
+ assert.equal(restored.version,18);assert.equal(restored.terrain.length,160000);
  for(let j=0;j<200;j++)for(let i=0;i<200;i++)assert.equal(restored.terrain[(j+100)*400+i+100],old[j*200+i]);
  assert.equal(restored.terrain[0],-2);
  world.camp={x:80,z:65};assert.deepEqual(decodeSave(encodeSave(new Float32Array(restored.terrain),world)).world.camp,world.camp);
@@ -125,7 +127,7 @@ test('archipelago upgrade preserves occupied and sculpted land and is applied on
  const old=new Float32Array(GRID*GRID),world=newWorld();world.camp={x:-5,z:3};
  for(let z=0;z<GRID;z++)for(let x=0;x<GRID;x++)old[z*GRID+x]=mainlandHeight((x+.5)*STEP-EXTENT/2,(z+.5)*STEP-EXTENT/2);
  const edit=65*GRID+106;old[edit]=3.75;
- const data=JSON.parse(encodeSave(old,world));data.version=8;
+ const data=JSON.parse(legacySave(old,world));data.version=8;
  const upgraded=decodeSave(JSON.stringify(data));assert.equal(upgraded.archipelagoUpgraded,true);
  assert.deepEqual(upgraded.world,world,'Existing villagers, food and livestock are untouched');
  assert.equal(upgraded.terrain[edit],old[edit],'Player sculpting survives');
@@ -135,18 +137,18 @@ test('archipelago upgrade preserves occupied and sculpted land and is applied on
  }
  assert.ok(upgraded.terrain.some((v,i)=>v>old[i]+1),'New islands are introduced');
  const sculpted=new Float32Array(upgraded.terrain);sculpted[edit]=-2;
- const restored=decodeSave(encodeSave(sculpted,upgraded.world));assert.deepEqual(restored.terrain,Array.from(sculpted),'Later sculpting is never regenerated');
+ const restored=decodeSave(encodeSave(sculpted,upgraded.world));assertTerrain(restored.terrain,Array.from(sculpted),'Later sculpting is never regenerated');
 });
 
 test('version 9 terrain reshapes once while village cargo, sculpting and established land survive',()=>{
  const terrain=new Float32Array(GRID*GRID),world=newWorld();world.camp={x:-5,z:3};
  for(let z=0;z<GRID;z++)for(let x=0;x<GRID;x++)terrain[z*GRID+x]=legacyArchipelagoHeight((x+.5)*STEP-EXTENT/2,(z+.5)*STEP-EXTENT/2);
  const edit=80*GRID+90;terrain[edit]=4.123;
- const data=JSON.parse(encodeSave(terrain,world));data.version=9;
- const next=decodeSave(JSON.stringify(data));assert.equal(next.version,17);assert.equal(next.archipelagoUpgraded,true);assert.deepEqual(next.world,world);assert.equal(next.terrain[edit],terrain[edit]);
+ const data=JSON.parse(legacySave(terrain,world));data.version=9;
+ const next=decodeSave(JSON.stringify(data));assert.equal(next.version,18);assert.equal(next.archipelagoUpgraded,true);assert.deepEqual(next.world,world);assert.equal(next.terrain[edit],terrain[edit]);
  assert.ok(next.terrain.some((v,i)=>v<terrain[i]-.5),'Vacated untouched islets return to water');
  assert.ok(next.terrain.some((v,i)=>v>terrain[i]+.5),'New headlands and connections appear');
- assert.deepEqual(decodeSave(encodeSave(new Float32Array(next.terrain),world)).terrain,next.terrain);
+ assertTerrain(decodeSave(encodeSave(new Float32Array(next.terrain),world)).terrain,next.terrain);
 });
 test('coastal rock clusters occupy water and disappear when their ground is raised',()=>{
  const t=new Terrain(),landscape=new Landscape(t),world=newWorld();try{
@@ -163,9 +165,9 @@ test('dense regional forests and broad highlands retain usable settlement cleari
   assert.ok(canopy>2200,`Expected substantial forests, got ${canopy} canopy pieces`);
   let oldHigh=0,newHigh=0;for(let z=0;z<GRID;z++)for(let x=0;x<GRID;x++){if(naturalArchipelagoHeight((x+.5)*STEP-EXTENT/2,(z+.5)*STEP-EXTENT/2)>=8.5)oldHigh++;if(woodedArchipelagoHeight((x+.5)*STEP-EXTENT/2,(z+.5)*STEP-EXTENT/2)>=8.5)newHigh++;}
   assert.ok(newHigh>oldHigh*1.35,'Larger mountain regions cover substantially more land');
-  const data=JSON.parse(encodeSave(t.values,world));data.version=10;
+  const data=JSON.parse(legacySave(t.values,world));data.version=10;
   data.terrain=data.terrain.map((_,i)=>Math.fround(naturalArchipelagoHeight((i%GRID+.5)*STEP-EXTENT/2,(Math.floor(i/GRID)+.5)*STEP-EXTENT/2)));
-  const upgraded=decodeSave(JSON.stringify(data));assert.equal(upgraded.version,17);assert.equal(upgraded.archipelagoUpgraded,true);assert.deepEqual(upgraded.world,world);
+  const upgraded=decodeSave(JSON.stringify(data));assert.equal(upgraded.version,18);assert.equal(upgraded.archipelagoUpgraded,true);assert.deepEqual(upgraded.world,world);
  }finally{landscape.dispose();t.dispose();}
 });
 test('gulls flock, black-bird murmurations stay cohesive, clouds vary in opacity and Pause freezes the sky',()=>{
@@ -228,10 +230,10 @@ test('mountain migration upgrades untouched land once while keeping edits and oc
   for(let j=0;j<GRID;j++)for(let i=0;i<GRID;i++)t.values[j*GRID+i]=woodedArchipelagoHeight((i+.5)*STEP-EXTENT/2,(j+.5)*STEP-EXTENT/2);
   const world=newWorld();world.camp={x:-37,z:-24};
   const edit=Math.floor((21+EXTENT/2)/STEP)*GRID+Math.floor((42+EXTENT/2)/STEP);t.values[edit]=7.75;
-  const data=JSON.parse(encodeSave(t.values,world));data.version=12;const saved=decodeSave(JSON.stringify(data));
+  const data=JSON.parse(legacySave(t.values,world));data.version=12;const saved=decodeSave(JSON.stringify(data));
   assert.ok(saved.archipelagoUpgraded);assert.deepEqual(saved.world,world);assert.equal(saved.terrain[edit],7.75);
   for(let j=0;j<GRID;j++)for(let i=0;i<GRID;i++)if(Math.hypot((i+.5)*STEP-EXTENT/2+37,(j+.5)*STEP-EXTENT/2+24)<17)assert.equal(saved.terrain[j*GRID+i],t.values[j*GRID+i]);
-  const again=decodeSave(encodeSave(new Float32Array(saved.terrain),saved.world));assert.deepEqual(again.terrain,saved.terrain);assert.equal(again.archipelagoUpgraded,undefined);
+  const again=decodeSave(encodeSave(new Float32Array(saved.terrain),saved.world));assertTerrain(again.terrain,saved.terrain);assert.equal(again.archipelagoUpgraded,undefined);
  }finally{t.dispose();}
 });
 test('cursor deflects gulls and black birds smoothly and flocks choose new destinations',()=>{
@@ -317,10 +319,10 @@ test('version 13 migration preserves occupied ground, individual edits and every
  const t=new Terrain();try{
   const old=t.values.map((_,k)=>mountainArchipelagoHeight((k%GRID+.5)*STEP-EXTENT/2,(Math.floor(k/GRID)+.5)*STEP-EXTENT/2));
   const world=newWorld();world.camp={x:-5,z:3};const edit=210*GRID+310;old[edit]=8.123;
-  const data=JSON.parse(encodeSave(old,world));data.version=13;const saved=decodeSave(JSON.stringify(data));
-  assert.equal(saved.version,17);assert.ok(saved.archipelagoUpgraded);assert.deepEqual(saved.world,world);assert.equal(saved.terrain[edit],old[edit]);
+  const data=JSON.parse(legacySave(old,world));data.version=13;const saved=decodeSave(JSON.stringify(data));
+  assert.equal(saved.version,18);assert.ok(saved.archipelagoUpgraded);assert.deepEqual(saved.world,world);assert.equal(saved.terrain[edit],old[edit]);
   for(let k=0;k<old.length;k++){const x=(k%GRID+.5)*STEP-EXTENT/2,z=(Math.floor(k/GRID)+.5)*STEP-EXTENT/2;if(Math.hypot(x+5,z-3)<17)assert.equal(saved.terrain[k],old[k]);}
-  assert.deepEqual(decodeSave(encodeSave(new Float32Array(saved.terrain),world)).terrain,saved.terrain);
+  assertTerrain(decodeSave(encodeSave(new Float32Array(saved.terrain),world)).terrain,saved.terrain);
  }finally{t.dispose();}
 });
 
@@ -357,10 +359,10 @@ test('spatial sections share seamless flat edges, contain their geometry and loc
 test('Mini God removes untouched mountain/tableland terrain while preserving version 14 edits and village state',()=>{
  const old=new Float32Array(GRID*GRID);for(let k=0;k<old.length;k++)old[k]=waterfallArchipelagoHeight((k%GRID+.5)*STEP-EXTENT/2,(Math.floor(k/GRID)+.5)*STEP-EXTENT/2);
  const world=newWorld();world.camp={x:5,z:6};const edit=190*GRID+170;old[edit]=11.123;
- const data=JSON.parse(encodeSave(old,world));data.version=14;const next=decodeSave(JSON.stringify(data));
- assert.equal(next.version,17);assert.deepEqual(next.world,world);assert.equal(next.terrain[edit],old[edit]);
+ const data=JSON.parse(legacySave(old,world));data.version=14;const next=decodeSave(JSON.stringify(data));
+ assert.equal(next.version,18);assert.deepEqual(next.world,world);assert.equal(next.terrain[edit],old[edit]);
  assert.ok(next.terrain.some((v,k)=>old[k]>12&&v<10.5),'Untouched high ground is reduced');
- assert.deepEqual(decodeSave(encodeSave(new Float32Array(next.terrain),world)).terrain,next.terrain);
+ assertTerrain(decodeSave(encodeSave(new Float32Array(next.terrain),world)).terrain,next.terrain);
 });
 test('ocean motion is half speed and followers no longer create tracks',()=>{
  const t=new Terrain(),ocean=createOcean(t),sim=new Settlement(t);try{
@@ -388,10 +390,10 @@ test('version 15 migration preserves established villages and edits while simpli
  const t=new Terrain();try{
   const old=t.values.map((_,k)=>miniGodArchipelagoHeight((k%GRID+.5)*STEP-EXTENT/2,(Math.floor(k/GRID)+.5)*STEP-EXTENT/2));
   const world=newWorld();world.camp={x:69,z:60};const edit=205*GRID+230;old[edit]=9.123;
-  const data=JSON.parse(encodeSave(old,world));data.version=15;const next=decodeSave(JSON.stringify(data));
-  assert.equal(next.version,17);assert.deepEqual(next.world,world);assert.equal(next.terrain[edit],old[edit]);
+  const data=JSON.parse(legacySave(old,world));data.version=15;const next=decodeSave(JSON.stringify(data));
+  assert.equal(next.version,18);assert.deepEqual(next.world,world);assert.equal(next.terrain[edit],old[edit]);
   for(let k=0;k<old.length;k++){const x=(k%GRID+.5)*STEP-EXTENT/2,z=(Math.floor(k/GRID)+.5)*STEP-EXTENT/2;if(Math.hypot(x-69,z-60)<17)assert.equal(next.terrain[k],old[k]);}
-  assert.deepEqual(decodeSave(encodeSave(new Float32Array(next.terrain),world)).terrain,next.terrain);
+  assertTerrain(decodeSave(encodeSave(new Float32Array(next.terrain),world)).terrain,next.terrain);
  }finally{t.dispose();}
 });
 
@@ -405,10 +407,10 @@ test('version 16 coastline migration preserves villages and player sculpts',()=>
  const old=new Float32Array(GRID*GRID);
  for(let k=0;k<old.length;k++)old[k]=broadMainlandHeight((k%GRID+.5)*STEP-EXTENT/2,(Math.floor(k/GRID)+.5)*STEP-EXTENT/2);
  const world=newWorld();world.camp={x:0,z:0};const edit=100*GRID+120;old[edit]=8.123;
- const data=JSON.parse(encodeSave(old,world));data.version=16;const next=decodeSave(JSON.stringify(data));
- assert.equal(next.version,17);assert.ok(next.archipelagoUpgraded);assert.deepEqual(next.world,world);assert.equal(next.terrain[edit],old[edit]);
+ const data=JSON.parse(legacySave(old,world));data.version=16;const next=decodeSave(JSON.stringify(data));
+ assert.equal(next.version,18);assert.ok(next.archipelagoUpgraded);assert.deepEqual(next.world,world);assert.equal(next.terrain[edit],old[edit]);
  assert.equal(next.terrain[200*GRID+200],old[200*GRID+200]);
- assert.deepEqual(decodeSave(encodeSave(new Float32Array(next.terrain),world)).terrain,next.terrain);
+ assertTerrain(decodeSave(encodeSave(new Float32Array(next.terrain),world)).terrain,next.terrain);
 });
 
 
@@ -423,4 +425,23 @@ test('ocean camera covers portrait, maximum zoom and low pitch without near/far 
   ocean.setWaterContacts([{x:3,z:5,radius:.5}]);assert.equal(ocean.mesh.material.uniforms.contactCount.value,1);
   ocean.setWaterContacts([]);assert.equal(ocean.mesh.material.uniforms.contactCount.value,0);
  }finally{ocean.dispose();t.dispose();}
+});
+
+test('version 18 compact terrain preserves layers, upgrades v17 and caches unchanged terrain',async()=>{
+ const {createSaveEncoder,encodeTerrain}=await import(pathToFileURL(resolve(temp,'save.mjs')));
+ const t=new Terrain();try{
+  const world=newWorld(),old=legacySave(t.values,world),v17=decodeSave(old);
+  assert.deepEqual(v17.terrain,Array.from(t.values),'Version 17 loads losslessly');
+  const raw=encodeSave(new Float32Array(v17.terrain),v17.world),payload=JSON.parse(raw);
+  assert.equal(payload.version,18);assert.equal(typeof payload.terrain,'string');assert.ok(raw.length<old.length/3);
+  const next=decodeSave(raw);assertTerrain(next.terrain,v17.terrain);assert.deepEqual(next.world,world);
+  const values=t.values.slice();for(let i=0;i<32;i++)for(let j=0;j<3;j++)values[i*3+j]=.5+i*.5+(j-1)*.00001;
+  assertTerrain(decodeSave(encodeSave(values,world)).terrain,Array.from(values));
+  const encode=createSaveEncoder(),first=JSON.parse(encode(values,world,0));values[100]=6.75;world.food++;
+  const cached=JSON.parse(encode(values,world,0));assert.equal(cached.terrain,first.terrain);assert.equal(cached.world.food,world.food);
+  const changed=JSON.parse(encode(values,world,1));assert.notEqual(changed.terrain,first.terrain);
+  assert.equal(changed.terrain,encodeTerrain(values));
+  for(const terrain of [payload.terrain.slice(4),'!'+payload.terrain.slice(1),[],payload.terrain+'AAAA'])assert.throws(()=>decodeSave(JSON.stringify({...payload,terrain})));
+  assert.equal(encodeTerrain(new Float32Array(next.terrain)),payload.terrain,'Repeated saves do not drift');
+ }finally{t.dispose();}
 });
