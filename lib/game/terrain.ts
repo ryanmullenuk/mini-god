@@ -418,7 +418,7 @@ export class Terrain {
       if(!size)continue;
       const position=new Float32Array(size),normal=new Float32Array(size),color=new Float32Array(size);let offset=0;
       for(const p of parts){position.set(p.position,offset);normal.set(p.normal,offset);color.set(p.color,offset);offset+=p.position.length;}
-      const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(position,3));geo.setAttribute('normal',new THREE.BufferAttribute(normal,3));geo.setAttribute('color',new THREE.BufferAttribute(color,3));geo.computeBoundingSphere();
+      const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(position,3));geo.setAttribute('normal',new THREE.BufferAttribute(normal,3));geo.setAttribute('color',new THREE.BufferAttribute(color,3));geo.computeBoundingBox();geo.computeBoundingSphere();
       const mesh=new THREE.Mesh(geo,this.materials[0]);mesh.name=`Terrain section ${chunk}`;mesh.userData.chunk=chunk;mesh.castShadow=true;mesh.receiveShadow=true;this.group.add(mesh);
     }
     this.group.children.sort((a,b)=>a.userData.chunk-b.userData.chunk);this.texture.needsUpdate=true;
@@ -429,7 +429,7 @@ export class Terrain {
       if(old){this.group.remove(old);old.geometry.dispose();}
       if(!part.position.length)continue;
       const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(part.position,3));geo.setAttribute('normal',new THREE.BufferAttribute(part.normal,3));geo.setAttribute('color',new THREE.BufferAttribute(part.color,3));
-      for(const g of part.groups)geo.addGroup(g.start,g.count,g.materialIndex);geo.computeBoundingSphere();
+      for(const g of part.groups)geo.addGroup(g.start,g.count,g.materialIndex);geo.computeBoundingBox();geo.computeBoundingSphere();
       const mesh=new THREE.Mesh(geo,this.materials);mesh.castShadow=part.layer>=FIRST_DRY_LAYER;mesh.receiveShadow=true;mesh.userData.layer=part.layer;this.group.add(mesh);
     }
     this.group.children.sort((a,b)=>a.userData.layer-b.userData.layer);this.texture.needsUpdate=true;

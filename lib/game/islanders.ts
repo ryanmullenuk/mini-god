@@ -1,13 +1,24 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Navigation } from './navigation';
 import { Terrain, EXTENT } from './terrain';
 import type { Settler } from './world-state';
 const TAU=Math.PI*2;
-const mat=(c:string)=>new THREE.MeshLambertMaterial({color:c,flatShading:true});
+/** Owned by one view; shared assets survive individual rigs and are freed on clear. */
+class PersonAssets {
+ materials=new Map<string,THREE.MeshLambertMaterial>();
+ geometries=new Map<string,THREE.BufferGeometry>();
+ readonly combined=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true});
+ readonly shadow=new THREE.MeshBasicMaterial({color:'#294331',transparent:true,opacity:.15,depthWrite:false});
+ material(c:string){let m=this.materials.get(c);if(!m){m=new THREE.MeshLambertMaterial({color:c,flatShading:true});this.materials.set(c,m);}return m;}
+ geometry(key:string,g:THREE.BufferGeometry){const cached=this.geometries.get(key);if(cached){if(cached!==g)g.dispose();return cached;}this.geometries.set(key,g);return g;}
+ dispose(){this.geometries.forEach(g=>g.dispose());this.materials.forEach(m=>m.dispose());this.combined.dispose();this.shadow.dispose();this.geometries.clear();this.materials.clear();}
+}
 function part(parent:THREE.Object3D,geo:THREE.BufferGeometry,material:THREE.Material,x=0,y=0,z=0){const m=new THREE.Mesh(geo,material);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m;}
 function ellipsoid(parent:THREE.Object3D,m:THREE.Material,x:number,y:number,z:number,sx:number,sy:number,sz:number,detail=1){const o=part(parent,new THREE.IcosahedronGeometry(1,detail),m,x,y,z);o.scale.set(sx,sy,sz);return o;}
 function limb(parent:THREE.Object3D,m:THREE.Material,len:number,r1:number,r2:number){return part(parent,new THREE.CylinderGeometry(r1,r2,len,6),m,0,-len/2,0);}
-function makePerson(female:boolean,index:number){
+function makePerson(female:boolean,index:number,assets:PersonAssets){
+ const mat=(c:string)=>assets.material(c);
  const root=new THREE.Group(),body=new THREE.Group();root.add(body);
  const skin=mat(['#bd783d','#ce8945','#a96534','#d5934d'][index%4]),hair=mat('#24261f'),blue=mat(female?'#279abc':'#246e98'),darkBlue=mat('#20567a'),trim=mat('#65b1c8'),shell=mat('#ffedba');
  const pelvis=new THREE.Group();pelvis.position.y=.695;body.add(pelvis);
@@ -38,7 +49,7 @@ function makePerson(female:boolean,index:number){
   const elbow=new THREE.Group();elbow.position.y=-.215;shoulder.add(elbow);limb(elbow,skin,.205,.036,.026);ellipsoid(elbow,skin,0,-.225,0,.031,.048,.024,0);arms.push({shoulder,elbow});
  }
  root.scale.setScalar((female?1.07:1.14)*.5);
- const shadow=part(root,new THREE.CircleGeometry(.27,16),new THREE.MeshBasicMaterial({color:'#294331',transparent:true,opacity:.15,depthWrite:false}),0,.018,0);shadow.rotation.x=-Math.PI/2;shadow.castShadow=false;
+ const shadow=part(root,new THREE.CircleGeometry(.27,16),assets.shadow,0,.018,0);shadow.rotation.x=-Math.PI/2;shadow.castShadow=false;
  const hammer=new THREE.Group();hammer.name='builder-hammer';hammer.position.set(0,-.22,0);arms[1].elbow.add(hammer);
  const handle=part(hammer,new THREE.CylinderGeometry(.018,.022,.25,6),mat('#8b643b'),0,0,.11);handle.rotation.x=Math.PI/2;
  part(hammer,new THREE.BoxGeometry(.16,.07,.065),mat('#788481'),0,0,.245);hammer.visible=false;
@@ -50,6 +61,29 @@ function makePerson(female:boolean,index:number){
  const tip=part(spear,new THREE.ConeGeometry(.055,.2,4),mat('#a5aaa0'),0,0,1.15);tip.rotation.x=Math.PI/2;spear.visible=false;
  const carried=new THREE.Group();carried.name='carried-animal';torso.add(carried);carried.position.set(0,-.02,.35);
  ellipsoid(carried,mat('#e3b8a1'),0,0,0,.18,.13,.24,0);ellipsoid(carried,mat('#ce9883'),0,.05,.22,.10,.08,.09,0);carried.visible=false;
+ // Merge rigid siblings in joint-local coordinates; keep every animated joint,
+ // skirt and recolourable cargo separate. One draw per rigid group, no material groups.
+ const groups:THREE.Group[]=[];root.traverse(o=>{if(o instanceof THREE.Group)groups.push(o);});
+ groups.forEach((group,ordinal)=>{
+  if(group===carried)return;
+  const meshes=group.children.filter((o):o is THREE.Mesh<THREE.BufferGeometry,THREE.MeshLambertMaterial>=>o instanceof THREE.Mesh&&o!==skirt&&o.material instanceof THREE.MeshLambertMaterial);
+  if(meshes.length<2)return;
+  const key=`rig:${female}:${index%4}:${ordinal}`;
+  let geometry=assets.geometries.get(key);
+  if(!geometry){
+   const parts=meshes.map(mesh=>{
+    mesh.updateMatrix();const g=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone();g.applyMatrix4(mesh.matrix);
+    g.deleteAttribute('uv');g.clearGroups();
+    const colors=new Float32Array(g.getAttribute('position').count*3),c=mesh.material.color;
+    for(let i=0;i<colors.length;i+=3){colors[i]=c.r;colors[i+1]=c.g;colors[i+2]=c.b;}
+    g.setAttribute('color',new THREE.BufferAttribute(colors,3));return g;
+   });
+   geometry=mergeGeometries(parts,false)!;parts.forEach(g=>g.dispose());assets.geometries.set(key,geometry);
+  }
+  for(const mesh of meshes){group.remove(mesh);mesh.geometry.dispose();}
+  part(group,geometry,assets.combined);
+ });
+ root.traverse(o=>{if(o instanceof THREE.Mesh&&o.material!==assets.combined){const g=o.geometry as THREE.BufferGeometry&{parameters?:unknown};o.geometry=assets.geometry(`${g.type}:${JSON.stringify(g.parameters)}`,g);}});
  return {root,body,pelvis,torso,head,legs,arms,skirt,hammer,rod,spear,carried};
 }
 type Person = ReturnType<typeof makePerson> & {
@@ -59,11 +93,12 @@ type Person = ReturnType<typeof makePerson> & {
 export class Islanders{
  group=new THREE.Group();people:Person[]=[];elapsed=0;
  private nav:Navigation;
+ private assets=new PersonAssets();
  constructor(private terrain:Terrain){this.nav=new Navigation(terrain);}
  add(count=2){
   const added=Math.min(count,30-this.people.length);
   for(let k=0;k<added;k++){
-   const i=this.people.length,rig=makePerson(i%2===1,i);
+   const i=this.people.length,rig=makePerson(i%2===1,i,this.assets);
    const p:Person={...rig,x:(i%4-1.5)*5-8,z:(Math.floor(i/4)%3-1)*5+1,angle:i*2.4,goal:null,idle:i*.19,phase:i*.47,kneel:0,speed:0,targetSpeed:.48+(i%3)*.035,previous:0};
    this.people.push(p);this.group.add(rig.root);this.relocate(p);
   }
@@ -111,10 +146,10 @@ export class Islanders{
    const relocated=!p.synced||Math.hypot(p.x-a.x,p.z-a.z)>1||Math.abs(p.root.position.y-targetY)>.65;
    const y=relocated||paused?targetY:THREE.MathUtils.damp(p.root.position.y,targetY,16,dt);
    p.synced=true;p.x=a.x;p.z=a.z;p.angle=a.heading;p.root.visible=true;p.root.position.set(a.x,y,a.z);p.root.rotation.y=a.heading;
-   if(!p.cargoMesh){p.cargoMesh=part(p.torso,new THREE.BoxGeometry(.28,.25,.26),mat('#bd995e'),0,-.05,.29);}
+   if(!p.cargoMesh){p.cargoMesh=part(p.torso,this.assets.geometries.get('cargo')??this.assets.geometry('cargo',new THREE.BoxGeometry(.28,.25,.26)),this.assets.material('#bd995e'),0,-.05,.29);}
    p.cargoMesh.visible=a.cargo.food+a.cargo.wood>0||!!a.cargo.construction;
    p.carried.visible=!!a.cargo.animal;p.carried.scale.setScalar(a.cargo.animal?.species==='chicken'?.65:1.7);
-   p.carried.children.forEach((o,k)=>{((o as THREE.Mesh).material as THREE.MeshLambertMaterial).color.set(a.cargo.animal?.species==='chicken'?(k?'#d8ab48':'#e9dfbb'):(k?'#ce9883':'#e3b8a1'));});
+   p.carried.children.forEach((o,k)=>{(o as THREE.Mesh).material=this.assets.material(a.cargo.animal?.species==='chicken'?(k?'#d8ab48':'#e9dfbb'):(k?'#ce9883':'#e3b8a1'));});
    p.rod.visible=a.job?.kind==='fish';p.spear.visible=a.job?.kind==='hunt'||a.job?.kind==='train';
    p.hammer.visible=a.job?.kind==='build'&&!a.job.route.length&&!a.stranded;
    if(paused)continue;
@@ -148,6 +183,6 @@ export class Islanders{
    p.skirt.rotation.z=Math.sin(phase)*.025*p.speed;
   }
  }
- clear(){this.dispose();this.group.clear();this.people=[];this.elapsed=0;}
- dispose(){this.group.traverse(o=>{const m=o as THREE.Mesh;if(m.isMesh){m.geometry.dispose();(Array.isArray(m.material)?m.material:[m.material]).forEach(x=>x.dispose());}});}
+ clear(){this.dispose();this.assets=new PersonAssets();this.group.clear();this.people=[];this.elapsed=0;}
+ dispose(){this.assets.dispose();}
 }

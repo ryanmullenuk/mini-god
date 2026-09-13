@@ -86,7 +86,7 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  if(pressed&&pointers.has(e.pointerId)){const dx=e.clientX-lastX,dy=e.clientY-lastY;
  if(pendingGuidance){showGuidance(pick(e.clientX,e.clientY),pendingGuidance.kind);}else if(sculpting){if(touchPending&&performance.now()-touchStartTime>120)startPendingTouch();if(!touchPending&&performance.now()-lastPaint>55)paint(e.clientX,e.clientY);}else if(dragButton!==0||e.shiftKey){pan(dx,dy);}else{yaw-=dx*.006;pitch=THREE.MathUtils.clamp(pitch+dy*.004,.4,Math.PI/2-.001);updateCamera();}
  lastX=e.clientX;lastY=e.clientY;
- }else{const p=pick(e.clientX,e.clientY);if(guideKind(settings.tool))showGuidance(p);else{hideGuidance();showBrush(p);}}
+ }else{hoverPending={x:e.clientX,y:e.clientY};}
  }
  function pointerUp(e:PointerEvent){
  if(pendingGuidance&&pendingGuidance.pointer===e.pointerId){
@@ -100,10 +100,12 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  if(sculpting&&pointers.size===1&&e.type!=='pointercancel'){startPendingTouch();const end=pick(e.clientX,e.clientY,true);if(end&&(!lastStampPoint||end.distanceTo(lastStampPoint)>.06))paint(e.clientX,e.clientY);}pointers.delete(e.pointerId);finishStroke();if(!pointers.size){pressed=false;}else{const p=[...pointers.values()][0];lastX=p.x;lastY=p.y;dragButton=2;}if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);if(e.pointerType==='touch')brush.visible=false;}
  function cancel(){pendingGuidance=null;hideGuidance();finishStroke();pointers.clear();pressed=false;brush.visible=false;}
  function wheel(e:WheelEvent){e.preventDefault();view=THREE.MathUtils.clamp(view*Math.exp(e.deltaY*.001),3.8,150);updateCamera();}
- const context=(e:Event)=>e.preventDefault(),leave=()=>{skyPointer=null;wildlife.setCursorRay(null);if(!pressed){brush.visible=false;hideGuidance();}};
+ const context=(e:Event)=>e.preventDefault(),leave=()=>{hoverPending=null;skyPointer=null;wildlife.setCursorRay(null);if(!pressed){brush.visible=false;hideGuidance();}};
  canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);canvas.addEventListener('pointerleave',leave);canvas.addEventListener('wheel',wheel,{passive:false});canvas.addEventListener('contextmenu',context);window.addEventListener('blur',cancel);
+ let hoverPending:{x:number;y:number}|null=null;
  let frame=0,last=performance.now(),elapsed=0,lastRebuild=0,lastSave=performance.now(),lastWaterContacts=-1000;
  const draw=(now:number)=>{frame=requestAnimationFrame(draw);const dt=Math.min((now-last)/1000,.05);last=now;if(!settings.paused)elapsed+=dt;
+ if(hoverPending){const pointer=hoverPending;hoverPending=null;if(!pressed&&(sculptTool(settings.tool)||guideKind(settings.tool))){const p=pick(pointer.x,pointer.y);if(guideKind(settings.tool))showGuidance(p);else showBrush(p);}}
  if(sculpting&&touchPending&&now-touchStartTime>120)startPendingTouch();
  if(sculpting&&!touchPending&&now-lastPaint>110&&pointers.size===1){const p=[...pointers.values()][0];paint(p.x,p.y);}
  if(dirty&&now-lastRebuild>115){rebuild();lastRebuild=now;}
