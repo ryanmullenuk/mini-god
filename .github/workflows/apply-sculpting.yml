@@ -1,0 +1,22 @@
+name: Apply staged sculpting commits
+on:
+  push:
+    branches: [perf/sculpting-input-and-saves]
+    paths: [.github/workflows/apply-sculpting.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply verified commits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gzip -dc sculpting-changes.patch.gz | git am
+          git rm sculpting-changes.patch.gz
+          git commit -m "Remove completed source transfer archive"
+          git push origin HEAD:perf/sculpting-input-and-saves
