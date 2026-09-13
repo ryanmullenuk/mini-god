@@ -102,15 +102,12 @@
 @media(max-height:550px){.compact-controls .hint{display:none}.shape-panel{padding:10px}.shape-heading{margin-bottom:5px}.shape-brush{padding-top:9px}}
 
 .wordmark{font-size:32px;letter-spacing:.12em}
-.mini-god-splash{position:absolute;overflow:hidden;background:#164654;isolation:isolate}
-.splash-beach{position:absolute;inset:0;width:100%;height:100%;z-index:-2}
-.mini-god-splash::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#092f4033,transparent 75%);z-index:-1;pointer-events:none}
-.splash-content{padding:24px;transform:translateY(-12vh);color:#fff8dc;text-shadow:0 3px 20px #123d4655}
-.splash-content h2{font-family:Georgia,serif;font-size:clamp(54px,8vw,116px);font-weight:normal;letter-spacing:.15em;margin:0 0 16px}
-.loading .splash-content p{font:12px/1.6 Arial,sans-serif;letter-spacing:.25em;text-transform:uppercase;margin:0 0 34px}
-.splash-content button{border:1px solid #ffffff9c;background:#f3f2dcec;color:#24504c;border-radius:40px;padding:15px 30px;font-size:14px;min-width:180px;box-shadow:0 8px 28px #153f4926;cursor:pointer}
-.splash-content button:disabled{opacity:.7;cursor:wait}.splash-content button:focus-visible{outline:3px solid white;outline-offset:5px}
-@media(max-width:600px){.wordmark{font-size:25px}.splash-content h2{font-size:52px}.splash-content{transform:translateY(-15vh)}}
+.mini-god-splash{position:absolute;overflow:hidden;isolation:isolate;background:linear-gradient(180deg,#439de0,#73bde9 48%,#164e4e);display:grid;grid-template-rows:minmax(0,1fr) auto;place-content:stretch;gap:0}
+.splash-artwork{display:block;width:100%;height:100%;min-height:0;object-fit:contain;user-select:none}
+.splash-entry{display:grid;justify-items:center;align-content:center;padding:12px 20px max(16px,env(safe-area-inset-bottom));color:#fff8dc}
+.splash-entry button{border:1px solid #ffffff9c;background:#f3f2dcec;color:#24504c;border-radius:40px;padding:15px 30px;font-size:14px;min-width:180px;box-shadow:0 8px 28px #153f494d;cursor:pointer}
+.splash-entry button:disabled{opacity:.7;cursor:wait}.splash-entry button:focus-visible{outline:3px solid white;outline-offset:5px}
+@media(max-width:600px){.wordmark{font-size:25px}}
 
 /* Compact icon-led village dock; information opens only when requested. */
 .village-panel.village-compact{top:145px;left:18px;width:250px;border-radius:16px;max-height:calc(100dvh - 275px);overflow:auto}
@@ -130,32 +127,3 @@
 @media(max-height:550px){.village-panel.village-compact{top:70px;max-height:calc(100dvh - 190px)}.compact-controls .bottom-guidance{display:flex;font-size:10px;min-height:22px}}
 /* Keep compact controls readable: shorten labels instead of shrinking type. */
 .icon-powers span,.food-tabs span,.food-tabs b,.compact-food small{font-size:12px}.village-compact .icon-powers button{min-width:0}.compact-food p,.compact-food label,.compact-food .food-focus,.food-actions button{font-size:14px}.village-compact .village-objective,.village-compact .village-milestone,.village-compact .faith-status,.village-compact .prayer-card p{font-size:14px}.village-compact .village-toggles button{font-size:12px}.building-entry>summary{font-size:14px}.food-tabs{grid-template-columns:repeat(2,1fr)}.food-tabs button{grid-template-columns:24px 1fr auto;align-items:center;min-height:42px;padding:6px}.food-tabs span{justify-self:start}.food-tabs b{justify-self:end}
-
-/* One mount, one incoming breaker. The original beach stays behind this overlay. */
-.splash-wave{position:absolute;inset:-20% -10% -40%;z-index:2;pointer-events:none;transform:translateY(110%);animation:splash-breaker 3.6s cubic-bezier(.36,0,.22,1) both}
-.splash-wave svg{display:block;width:100%;height:100%}
-.splash-content{position:relative;z-index:1}
-.splash-title{opacity:0;visibility:hidden;animation:splash-title-reveal 3.6s ease-out both}
-.splash-subtitle,.splash-entry{opacity:0;visibility:hidden;animation:splash-follow-reveal .55s ease-out both}
-.splash-subtitle{animation-delay:2.9s}
-.splash-entry{animation-delay:3.15s}
-@keyframes splash-breaker{
-  0%,18%{transform:translateY(110%)}
-  42%,48%{transform:translateY(-4%)}
-  100%{transform:translateY(110%)}
-}
-@keyframes splash-title-reveal{
-  0%,48%{opacity:0;visibility:hidden;clip-path:inset(0 0 100% 0)}
-  49%{visibility:visible;opacity:0;clip-path:inset(0 0 100% 0)}
-  78%,100%{opacity:1;visibility:visible;clip-path:inset(0)}
-}
-@keyframes splash-follow-reveal{
-  from{opacity:0;visibility:hidden;transform:translateY(6px)}
-  to{opacity:1;visibility:visible;transform:translateY(0)}
-}
-@media(prefers-reduced-motion:reduce){
-  .splash-wave{display:none;animation:none}
-  .splash-title{animation:splash-follow-reveal .4s ease-out 1.8s both}
-  .splash-title,.splash-subtitle,.splash-entry{transform:none}
-  @keyframes splash-follow-reveal{from{opacity:0;visibility:hidden}to{opacity:1;visibility:visible}}
-}

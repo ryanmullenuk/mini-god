@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Footprints, Hand, Users, HelpCircle, Pause, Play, Focus, MousePointer2, CloudRain, Sprout, Sparkles, Wheat, TreePine, House, Download, Upload, ChevronDown, ChevronUp, Layers3, RotateCcw, X, Flag, Landmark, Beef, Fish, Hammer, Warehouse, Volume2, VolumeX } from 'lucide-react';
 import { CoastalAmbience } from '@/lib/game/ambience';
-import { SplashBeach } from '@/components/splash-beach';
 import { FoodPanel } from '@/components/food-panel';
 import { WorldToolbar } from '@/components/world-toolbar';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -146,25 +145,10 @@ export default function Home() {
     <div className="bottom-left"><span>Island Nº 001</span>{save}</div>
     {!population && <div className="bottom-right"><Users />Choose where your civilisation begins</div>}
 
-    {(!ready||!started) && <div className="loading mini-god-splash"><SplashBeach/>
-      <div className="splash-wave" aria-hidden="true">
-        <svg viewBox="0 0 1440 1000" preserveAspectRatio="none">
-          <path fill="#e4f5e8" d="M0 105Q90 40 180 92T360 78T540 105T720 68T900 90T1080 74T1260 98T1440 65V1000H0Z"/>
-          <path fill="#a2ded0" d="M0 132Q100 77 200 118T400 107T600 133T800 99T1000 125T1200 112T1440 106V1000H0Z"/>
-          <path fill="#5bc2bc" d="M0 178Q120 109 240 161T480 153T720 170T960 146T1200 166T1440 151V1000H0Z"/>
-          <path fill="#348f9d" d="M0 256Q160 180 320 229T640 228T960 239T1280 224T1440 248V1000H0Z"/>
-          <path fill="#26798b" d="M0 415Q240 300 480 387T960 366T1440 390V1000H0Z"/>
-          <g fill="none" stroke="#f3fae9" strokeWidth="6" strokeLinecap="round" opacity=".7">
-            <path d="M35 110Q90 77 145 101M290 101Q342 82 392 103M560 117Q613 136 665 112M750 90Q810 80 866 104M1040 96Q1090 76 1144 99M1250 111Q1320 139 1390 104"/>
-          </g>
-          <g fill="#edf8e9" opacity=".8">
-            <ellipse cx="125" cy="60" rx="12" ry="5"/><ellipse cx="322" cy="51" rx="8" ry="4"/>
-            <ellipse cx="570" cy="75" rx="14" ry="5"/><ellipse cx="782" cy="35" rx="9" ry="4"/>
-            <ellipse cx="1044" cy="47" rx="13" ry="5"/><ellipse cx="1280" cy="64" rx="10" ry="4"/>
-          </g>
-        </svg>
-      </div>
-      <div className="splash-content"><h2 className="splash-title">Mini God</h2><p className="splash-subtitle">A little world in your hands</p><div className="splash-entry">{error?<div className="error-message" role="alert">{error}</div>:<button disabled={!ready} onClick={enterWorld}>{ready?'Enter your world':'Shaping your island…'}</button>}</div></div></div>}
+    {(!ready||!started) && <div className="loading mini-god-splash">
+      <img className="splash-artwork" src="/polygod-splash.png" width={941} height={1672} alt="PolyGod — Build, Grow, Thrive. Islanders overlooking a tropical island village." fetchPriority="high" draggable={false}/>
+      <div className="splash-entry">{error?<div className="error-message" role="alert">{error}</div>:<button disabled={!ready} onClick={enterWorld}>{ready?'Enter your world':'Shaping your island…'}</button>}</div>
+    </div>}
     <input ref={file} hidden type="file" accept=".json,application/json" aria-label="Import island save" onChange={e => void importIsland(e.target.files?.[0])} />
     <Dialog open={help} onOpenChange={setHelp}><DialogContent className="help-content living-help"><DialogTitle>A little world, finding its way.</DialogTitle><DialogDescription>Shape the terrain. Your settlers decide how to live on it.</DialogDescription>
       <div className="help-grid"><Users /><p><b>Guide your followers</b>Gather followers (7) calls up to six available islanders to a beacon for a brief gathering. Builders and supply carriers finish their work; hungry followers need food first. A beacon lasts up to 90 seconds and can be dismissed. Choose settlement, then click a green preview on a broad grass terrace to welcome your first followers. Next, choose Guide hut or Guide farm. A green preview marks a suitable site; tap or click to leave your guidance. Followers gather the wood and build. Guidance is free: huts need 6 wood, farms need 3. Requests take priority over automatic expansion and can be withdrawn until work starts.</p><Footprints /><p><b>Make room to grow</b>Open SHAPE in the bottom bar for Raise, Lower, Path and brush size. Each drag sculpts one layer on the starting terrace. Release before shaping the next. Islanders can climb one layer at a time, with space to stand between steps. Taller cliffs need a staircase. Start Path on a low terrace to trim only the layer immediately above it.</p><CloudRain /><p><b>Listen to their prayers</b>Meet real needs to earn faith. Build a temple (8) to extend influence and receive offerings from worshippers. Collect those offerings, then aim Rain or New growth within your influence. Two huts, a delivered harvest and a temple unlock tier 2 and larger blessings. Slaughterhouses (9) rear goats using surplus food and prepare meat for delivery; the breeding pair is protected. Natural showers also arrive over time.</p><Hand /><p><b>Explore</b>The bottom bar includes adding islanders, zoom, a compass that faces north when clicked, and a top-view toggle. Drag to orbit, scroll to zoom and right-drag to pan. On touch screens, use two fingers to pan and zoom. A broad mainland provides room for settlements. Three small islands remain offshore. Sculpt a dry crossing and one-layer steps if you want to reach them.</p></div>
