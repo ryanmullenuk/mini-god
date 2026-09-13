@@ -130,3 +130,32 @@
 @media(max-height:550px){.village-panel.village-compact{top:70px;max-height:calc(100dvh - 190px)}.compact-controls .bottom-guidance{display:flex;font-size:10px;min-height:22px}}
 /* Keep compact controls readable: shorten labels instead of shrinking type. */
 .icon-powers span,.food-tabs span,.food-tabs b,.compact-food small{font-size:12px}.village-compact .icon-powers button{min-width:0}.compact-food p,.compact-food label,.compact-food .food-focus,.food-actions button{font-size:14px}.village-compact .village-objective,.village-compact .village-milestone,.village-compact .faith-status,.village-compact .prayer-card p{font-size:14px}.village-compact .village-toggles button{font-size:12px}.building-entry>summary{font-size:14px}.food-tabs{grid-template-columns:repeat(2,1fr)}.food-tabs button{grid-template-columns:24px 1fr auto;align-items:center;min-height:42px;padding:6px}.food-tabs span{justify-self:start}.food-tabs b{justify-self:end}
+
+/* One mount, one incoming breaker. The original beach stays behind this overlay. */
+.splash-wave{position:absolute;inset:-20% -10% -40%;z-index:2;pointer-events:none;transform:translateY(110%);animation:splash-breaker 3.6s cubic-bezier(.36,0,.22,1) both}
+.splash-wave svg{display:block;width:100%;height:100%}
+.splash-content{position:relative;z-index:1}
+.splash-title{opacity:0;visibility:hidden;animation:splash-title-reveal 3.6s ease-out both}
+.splash-subtitle,.splash-entry{opacity:0;visibility:hidden;animation:splash-follow-reveal .55s ease-out both}
+.splash-subtitle{animation-delay:2.9s}
+.splash-entry{animation-delay:3.15s}
+@keyframes splash-breaker{
+  0%,18%{transform:translateY(110%)}
+  42%,48%{transform:translateY(-4%)}
+  100%{transform:translateY(110%)}
+}
+@keyframes splash-title-reveal{
+  0%,48%{opacity:0;visibility:hidden;clip-path:inset(0 0 100% 0)}
+  49%{visibility:visible;opacity:0;clip-path:inset(0 0 100% 0)}
+  78%,100%{opacity:1;visibility:visible;clip-path:inset(0)}
+}
+@keyframes splash-follow-reveal{
+  from{opacity:0;visibility:hidden;transform:translateY(6px)}
+  to{opacity:1;visibility:visible;transform:translateY(0)}
+}
+@media(prefers-reduced-motion:reduce){
+  .splash-wave{display:none;animation:none}
+  .splash-title{animation:splash-follow-reveal .4s ease-out 1.8s both}
+  .splash-title,.splash-subtitle,.splash-entry{transform:none}
+  @keyframes splash-follow-reveal{from{opacity:0;visibility:hidden}to{opacity:1;visibility:visible}}
+}
