@@ -116,7 +116,7 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  if(pendingGuidance&&guideKind(settings.tool)!==pendingGuidance.kind)pendingGuidance=null;canvas.style.cursor=settings.tool==='move'?(pressed?'grabbing':'grab'):'crosshair';
  refreshScenery();
  if(now-lastWaterContacts>1000&&!sculpting){ocean.setWaterContacts(simulation.state.plots.filter(p=>terrain.height(p.x,p.z)<SEA).map(p=>({x:p.x,z:p.z,radius:p.kind==='home'?.65:1.25})));lastWaterContacts=now;}
- const stopped=settings.paused||sculpting||mesher.busy;
+ const stopped=settings.paused;
  simulation.advance(dt*settings.speed,stopped);islanders.sync(simulation.state.settlers,dt*settings.speed,stopped);villageView.update(simulation,settings.showPlots,settings.showInfluence||settings.tool==='rain'||settings.tool==='bloom');
  if(now-lastSave>15000&&!sculpting&&!mesher.busy){saveNow();lastSave=now;}
  const light=daylight.update(simulation.state.time);if(Math.floor(elapsed*8)!==Math.floor((elapsed-dt)*8))renderer.shadowMap.needsUpdate=true;ocean.setLighting(light.direction,light.colour,light.strength,light.tint,scene.background as THREE.Color);landscape.setLighting(light.tint);
