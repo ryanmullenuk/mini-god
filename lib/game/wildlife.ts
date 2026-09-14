@@ -87,6 +87,11 @@ export class Wildlife {
     this.fins=instanced(polygon([0,.07,-.14,0,.14,-.12,0,.09,.13]),new THREE.MeshLambertMaterial({color:'#ffffff',side:THREE.DoubleSide}),count);
     this.eyes=instanced(new THREE.OctahedronGeometry(1,0),new THREE.MeshBasicMaterial({color:'#17343c'}),count*2);
     for(let i=0;i<count;i++){const c=new THREE.Color(FISH_COLOURS[i%FISH_COLOURS.length]);this.bodies.setColorAt(i,c);this.tails.setColorAt(i,c.clone().multiplyScalar(.88));this.fins.setColorAt(i,c.clone().lerp(new THREE.Color('#fff2ce'),.35));}
+    // Water is intentionally opaque for the reef palette. Draw translucent fish
+    // after it, retaining depth tests so beaches and rocks still occlude them.
+    for(const mesh of [this.bodies,this.tails,this.fins,this.eyes]){
+      const material=mesh.material as THREE.Material;material.transparent=true;material.opacity=.72;material.depthWrite=false;mesh.renderOrder=3;
+    }
     this.group.add(this.bodies,this.tails,this.fins,this.eyes);
 
     for(const [i,count] of [10,12,1,1,1,1,1,1,1,1,1,1].entries()){

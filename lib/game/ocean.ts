@@ -73,13 +73,15 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       colour+=sunColour*glint*lightPower*(.85+.15*broad)*(.92+.08*swell);
       // The wave wash is tied to actual submerged height, including sculpted bays.
       float shore=texture2D(shoreMap,clamp(uv,0.,1.)).r;
-      float phase=time*.34+noise(p*.09)*4.;
-      float breath=.48+.16*sin(phase);
+      float phase=time*.85+noise(p*.09)*4.;
+      float breath=.38+.20*sin(phase);
       // One slow advancing wash, broken up along the shore; no ocean-wide rings.
-      float wash=.35+.85*(.5+.5*sin(phase));
+      float wash=.25+1.35*(.5+.5*sin(phase));
       float breaker=(1.-smoothstep(.10,.38,abs(shore-wash)))
-        *(1.-smoothstep(1.3,2.,shore))*(.18+.20*broad);
+        *(1.-smoothstep(1.3,2.,shore))*(.55+.25*broad);
       float foam=((1.-smoothstep(.10,.40,depth))*breath+breaker)*inside;
+      // A fading wake makes the advancing crest read as gentle breaking surf.
+      foam+=inside*(1.-smoothstep(.05,.75,abs(shore-wash+.32)))*(.10+.12*broad);
       for(int i=0;i<32;i++){
         if(i>=contactCount)break;
         float edge=abs(length(p-contacts[i].xy)-contacts[i].z);

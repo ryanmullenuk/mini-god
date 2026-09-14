@@ -1,0 +1,21 @@
+name: Apply verified surf update
+on:
+  push:
+    branches: [fix/shore-surf-and-fish]
+    paths: [.github/workflows/apply-surf.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gzip -dc surf-fish.patch.gz | git am
+          git rm surf-fish.patch.gz
+          git commit -m "Remove completed transfer archive"
+          git push origin HEAD:fix/shore-surf-and-fish
