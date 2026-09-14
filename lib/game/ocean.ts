@@ -39,20 +39,25 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       vec2 p=world.xz,uv=(p+extent*.5)/extent;
       float inside=step(0.,uv.x)*step(0.,uv.y)*step(uv.x,1.)*step(uv.y,1.);
       float h=texture2D(heightMap,clamp(uv,0.,1.)).r;
-      // Same submerged terrace tops as Terrain.height: six 0.3-unit steps.
+      // Interpolate submerged colour depth so visible water does not form contour rings.
       float level=floor((h-.5)/.5);
-      float bottom=level<0.?-1.935:(level<6.?-1.635+level*.3:.165+(level-6.)*.28);
+      float bottom=level<6.?h*.6-2.235:.165+(level-6.)*.28;
       float depth=mix(6.,max(0.,sea-bottom),inside);
       // Submerged terraces can reach the finite simulation boundary. Round
       // that shelf into open water before its clipped, straight edge is visible.
       float margin=extent*.5-max(abs(p.x),abs(p.y));
       float shelfEnd=1.-smoothstep(1.5,11.+noise(p*.10)*5.,margin);
       depth=mix(depth,6.,shelfEnd*smoothstep(.2,.8,depth));
-      vec3 colour=vec3(.30,.68,.65);
-      colour=mix(colour,vec3(.065,.45,.44),smoothstep(.15,.18,depth));
-      colour=mix(colour,vec3(.025,.28,.32),smoothstep(.45,.48,depth));
-      colour=mix(colour,vec3(.012,.12,.17),smoothstep(.85,.89,depth));
-      colour=mix(colour,vec3(.004,.020,.048),smoothstep(1.48,1.53,depth));
+      // Continuous lagoon-to-cobalt colour, with a broken reef visible in shallows.
+      // Reuse the height/shore maps; no animated texture uploads or new draw calls.
+      float waterDepth=depth+(noise(p*.18)-.5)*.09;
+      vec3 colour=vec3(.27,.78,.72);
+      colour=mix(colour,vec3(.055,.60,.64),smoothstep(.12,.55,waterDepth));
+      colour=mix(colour,vec3(.015,.32,.48),smoothstep(.45,1.15,waterDepth));
+      colour=mix(colour,vec3(.006,.055,.20),smoothstep(1.0,2.1,waterDepth));
+      float reef=smoothstep(.58,.78,noise(p*.83+noise(p*.19)*3.));
+      float reefDepth=smoothstep(.2,.55,depth)*(1.-smoothstep(1.1,1.65,depth))*inside;
+      colour=mix(colour,vec3(.035,.28,.30),reef*reefDepth*.48);
       // Domain-warped swells have no shared grid or repeating crest spacing.
       vec2 drift=vec2(time*.018,-time*.011);
       vec2 warp=vec2(noise(p*.037+drift),noise(p*.043-drift+19.));
@@ -63,7 +68,7 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       vec3 normal=normalize(vec3(.055*cos(p.x*.055+warp.x*3.+time*.24),1.,.045*sin(p.y*.064+warp.y*3.-time*.19)));
       vec3 halfLight=normalize(sunDirection+viewDirection);
       float glint=pow(max(0.,dot(normal,halfLight)),7.);
-      float lightPower=mix(.10,.20,sunStrength);
+      float lightPower=mix(.025,.075,sunStrength);
       colour*=daylightTint;
       colour+=sunColour*glint*lightPower*(.85+.15*broad)*(.92+.08*swell);
       // The wave wash is tied to actual submerged height, including sculpted bays.
@@ -82,7 +87,7 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       }
       foam*=.8+.2*noise(p*.75+vec2(time*.035,-time*.025));
       colour=mix(colour,vec3(.83,.95,.94)*daylightTint,clamp(foam,0.,.85));
-      float alpha=mix(.72,1.,smoothstep(.1,.9,depth));
+      float alpha=mix(.90,1.,smoothstep(.1,.7,depth));
       // Irregular mist blends into the sky before any finite mesh boundary.
       float radius=length(p/vec2(1.08,.98));
       float wisps=(noise(p*.024+vec2(time*.003,-time*.002))-.5)*18.;

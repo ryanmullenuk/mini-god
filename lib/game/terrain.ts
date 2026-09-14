@@ -9,7 +9,7 @@ export const LAYER_HEIGHTS = [-1.7,-1.4,-1.1,-.8,-.5,-.2,.10,.38,.66,.94,1.22,1.
 export const LAYER_COUNT = LAYER_HEIGHTS.length;
 export const layerThreshold = (l:number) => .5 + l * LAYER_INTERVAL;
 export const scalarLevel = (h:number) => Math.max(-1,Math.min(LAYER_COUNT-1,Math.floor((h-.5)/LAYER_INTERVAL)));
-export const PALETTE = ['#13374e','#1e536a','#29798a','#42aca8','#79cbbc','#b7e0c9','#f5e9bd','#f0dda5','#e4d08d','#c7d786','#b3d27b','#a0c56c','#8eb85e','#77aa51','#639b49','#518d44','#afac68','#b8a073','#a88c63','#8e7354','#898365','#888871','#818576','#7a8277','#737c77','#777f7c','#808885','#89928e','#939b96','#a0a69e','#b1b6ab','#c3c7bb'];
+export const PALETTE = ['#123f73','#176994','#218fa8','#39b9bd','#75dacf','#b7eadb','#fff0cc','#f7e4ad','#eddaa0','#b8cd72','#a4c365','#94b756','#82aa47','#709b3d','#618b36','#507b32','#829653','#a4a07b','#aaa084','#9c927a','#918978','#898575','#828071','#797a70','#77796f','#828479','#8e9184','#9b9e8e','#aaac99','#b6b7a3','#c3c3ad','#d0ccb5'];
 export const DESERT_PALETTE = [...PALETTE.slice(0,8),'#e9cc88','#e0c27e','#d9b875','#d4af6e','#d0a86a','#cba166','#c39a62','#bd915e','#ba885b','#b67e56','#a96f50','#946248','#97785c','#9c8063','#a18b6d','#a59477','#9c917c','#918a7b','#968e7d','#a39883','#ad9f89','#b5aa95','#c2b6a2','#d0c5b2'];
 export const LAYER_NAMES = ['Deep seabed','Seabed','Ocean shelf','Lagoon','Shallows','Tidal shelf','Beach','Sand','Dune','Coastal grass','Light grass','Meadow','Grass','Rich grass','High grass','Dark grass','Upland soil','Earth','Dirt','High earth','Foothill','Upland','Ridge grass','Rocky grass','Lower rock','Rock','High rock','Crag','Summit rock','Pale rock','High summit','Peak'];
 export type SculptMode = 'raise'|'lower'|'path';
@@ -324,6 +324,35 @@ export function archipelagoHeight(x:number,z:number){
   }
   return THREE.MathUtils.clamp(h,-2,10.35);
 }
+const TROPICAL_PEAKS=[{x:39,z:-32,rx:13,rz:11,height:16.25},{x:55,z:-18,rx:10,rz:9,height:13.8},{x:-56,z:26,rx:10,rz:11,height:13.5}];
+const TROPICAL_INLETS=[
+  {a:{x:58,z:55},b:{x:58,z:91},width:8},
+  {a:{x:-83,z:-22},b:{x:-112,z:-40},width:7},
+  {a:{x:35,z:-66},b:{x:45,z:-103},width:7},
+];
+/** New-world highlands; historical generators remain stable for save migration.
+ * Every peak uses the same editable samples and one-layer navigation rules. */
+export function tropicalArchipelagoHeight(x:number,z:number){
+  let h=archipelagoHeight(x,z);
+  // Open the round coastal basins into bays rather than landlocked shore pools.
+  for(const inlet of TROPICAL_INLETS){
+    const d=distanceToSegment(x,z,inlet.a,inlet.b)/inlet.width;
+    if(d<1.6)h=Math.min(h,1.4+3.2*d*d);
+  }
+  if(h<5.8)return h;
+  for(const peak of TROPICAL_PEAKS){
+    const u=(x-peak.x)/peak.rx,v=(z-peak.z)/peak.rz;
+    const angle=Math.atan2(v,u),r=Math.hypot(u,v)*(1+.11*Math.sin(angle*5+.7)+.06*Math.cos(angle*3));
+    if(r<1)h=Math.max(h,6.25+(peak.height-6.25)*Math.pow(1-r,1.15));
+  }
+  for(const isle of ISLETS){
+    const {u,v}=islePoint(x,z,isle),r=Math.hypot((u+.12)/.40,(v+.08)/.40);
+    if(r<1)h=Math.max(h,6.25+7.7*Math.pow(1-r,1.05));
+  }
+  // Existing pools remain open even at the foot of a new ridge.
+  for(const pool of POOLS){const d=Math.hypot((x-pool.x)/pool.rx,(z-pool.z)/pool.rz);if(d<1.5)h=Math.min(h,1.15+2.12*d*d);}
+  return Math.min(16.3,h);
+}
 /** Vegetation regions are separate from historical terrain palettes/save baselines. */
 export function vegetationBiome(x:number,z:number):IslandBiome|'mango'|null{
   const offshore=islandBiome(x,z);if(offshore)return offshore;
@@ -365,7 +394,7 @@ export class Terrain {
   constructor() {
     for(let j=0;j<GRID;j++)for(let i=0;i<GRID;i++){
       const x=(i+.5)*STEP-EXTENT/2,z=(j+.5)*STEP-EXTENT/2;
-      this.values[j*GRID+i]=archipelagoHeight(x,z);
+      this.values[j*GRID+i]=tropicalArchipelagoHeight(x,z);
     }
     this.texture=new THREE.DataTexture(this.values,GRID,GRID,THREE.RedFormat,THREE.FloatType);
     this.texture.minFilter=THREE.LinearFilter;this.texture.magFilter=THREE.LinearFilter;
@@ -472,16 +501,21 @@ export function buildTerrainGeometry(values:Float32Array,previous?:Float32Array,
       }
       if(!shapes.length){result.push({layer:l,position:new Float32Array(),normal:new Float32Array(),color:new Float32Array(),groups:[]});return;}
       const bottom=layerY(l-1)+.012,depth=layerY(l)-bottom;
-      const geo=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:true,bevelSize:.08,bevelThickness:.035,bevelSegments:1,steps:1,curveSegments:1});
+      const geo=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:l>=FIRST_DRY_LAYER&&l<17,bevelSize:.08,bevelThickness:.035,bevelSegments:1,steps:1,curveSegments:1});
       geo.rotateX(-Math.PI/2);geo.translate(0,bottom,0);
-      const vertices=geo.getAttribute('position'),colours=new Float32Array(vertices.count*3),base=new THREE.Color(PALETTE[l]),desert=new THREE.Color(DESERT_PALETTE[l]),c=new THREE.Color();
+      const vertices=geo.getAttribute('position'),colours=new Float32Array(vertices.count*3),base=new THREE.Color(PALETTE[l]),desert=new THREE.Color(DESERT_PALETTE[l]),c=new THREE.Color(),rock=new THREE.Color('#9c9987'),pineRock=new THREE.Color(l>17?'#a8aaa1':'#89948b'),autumnRock=new THREE.Color('#ad815c');
+      const normals=geo.getAttribute('normal');
       for(let v=0;v<vertices.count;v++){
         c.copy(base).lerp(desert,l>=8?desertWeight(vertices.getX(v),vertices.getZ(v)):0);
         if(l>=16){
           const biome=islandBiome(vertices.getX(v),vertices.getZ(v));
-          if(biome==='pine'||biome==='birch')c.lerp(new THREE.Color(l>17?'#a8aaa1':'#89948b'),.7);
-          else if(biome==='autumn')c.lerp(new THREE.Color('#ad815c'),.45);
+          if(biome==='pine'||biome==='birch')c.lerp(pineRock,.7);
+          else if(biome==='autumn')c.lerp(autumnRock,.45);
         }
+        const x=vertices.getX(v),z=vertices.getZ(v);
+        if(l>=17)c.lerp(rock,(1-Math.abs(normals.getY(v)))*.65);
+        // Deterministic world-space variation keeps adjacent worker chunks seamless.
+        if(l>=9)c.multiplyScalar(.96+.045*Math.sin(x*.37+z*.19)*Math.cos(z*.29)+.025*Math.sin(x*.91-z*.63));
         colours[v*3]=c.r;colours[v*3+1]=c.g;colours[v*3+2]=c.b;
       }
       geo.setAttribute('color',new THREE.BufferAttribute(colours,3));

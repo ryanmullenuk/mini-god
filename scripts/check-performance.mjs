@@ -13,7 +13,7 @@ for(const name of ['terrain','navigation','islanders','terrain-picking']){
 }
 const {Navigation}=await import(pathToFileURL(resolve(temp,'navigation.mjs')));
 const {Islanders}=await import(pathToFileURL(resolve(temp,'islanders.mjs')));
-const {Terrain}=await import(pathToFileURL(resolve(temp,'terrain.mjs')));
+const {Terrain,tropicalArchipelagoHeight,archipelagoHeight,GRID,STEP,EXTENT}=await import(pathToFileURL(resolve(temp,'terrain.mjs')));
 
 test('cached detours are independent, exact and invalidated for terrain and buildings',()=>{
  let samples=0,flooded=false,wall=true;
@@ -72,4 +72,15 @@ test('heightmap picking handles orthographic rays, risers and empty sea without 
  assert.ok(Math.abs(cliff.x)<.001);assert.equal(cliff.y,2);
  reads=0;assert.equal(pickTerrain(new THREE.Ray(new THREE.Vector3(300,30,0),new THREE.Vector3(0,-1,0)),terrain,2000),null);assert.equal(reads,0);
  assert.equal(pickTerrain(vertical,terrain,10),null);
+});
+
+test('tropical generation adds editable peaks while retaining clearings and open bays',()=>{
+ assert.ok(tropicalArchipelagoHeight(39,-32)>15);
+ assert.ok(tropicalArchipelagoHeight(0,0)>=6);
+ for(const [x,z] of [[58,55],[58,75],[-98,-31],[40,-84]])assert.ok(tropicalArchipelagoHeight(x,z)<3.5);
+ for(const [x,z] of [[-24,14],[36,4],[12,-35]])assert.ok(tropicalArchipelagoHeight(x,z)<3.5,'Pools stay open');
+ const terrain=new Terrain();try{
+  for(let k=0;k<terrain.values.length;k+=127){const x=(k%GRID+.5)*STEP-EXTENT/2,z=(Math.floor(k/GRID)+.5)*STEP-EXTENT/2;assert.equal(terrain.values[k],Math.fround(tropicalArchipelagoHeight(x,z)));}
+  const oldHeight=archipelagoHeight(39,-32);assert.ok(oldHeight<10.35,'Historical generation remains stable for migrations');
+ }finally{terrain.dispose();}
 });

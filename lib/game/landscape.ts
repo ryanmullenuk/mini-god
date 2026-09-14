@@ -50,7 +50,7 @@ export class Landscape {
     leaf.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0, .75,.20,-.25, .8,.31,0, 0,0,0,.8,.31,0,.75,.20,.25, .75,.20,-.25,1.9,-.35,0,.8,.31,0, .8,.31,0,1.9,-.35,0,.75,.20,.25],3));leaf.computeVertexNormals();
     this.palms=batch('Beach palm fronds',leaf,'#ffffff',6500,.08);
     (this.palms.material as THREE.MeshLambertMaterial).side=THREE.DoubleSide;
-    this.rocks=batch('Upland rocks',new THREE.IcosahedronGeometry(.6,0),'#998d76',40000);
+    this.rocks=batch('Upland rocks',new THREE.IcosahedronGeometry(.6,0),'#a69f87',40000);
     this.flowers=batch('Flowers',new THREE.IcosahedronGeometry(.09,0),'#ffffff',2200,.10);
     this.seaRocks=batch('Shoreline boulders',new THREE.IcosahedronGeometry(1,0),'#ffffff',1000);
     const foamGeometry=new THREE.RingGeometry(.76,1.7,24,3);foamGeometry.rotateX(-Math.PI/2);
@@ -115,17 +115,22 @@ export class Landscape {
       if(l<FIRST_DRY_LAYER||plots.some(p=>Math.abs(p.x-x)<3&&Math.abs(p.z-z)<3)||state.resources.some(p=>Math.hypot(x-p.x,z-p.z)<1.9))continue;
       // The broad starting clearing remains available for a first village.
       if(state.camp&&Math.hypot(x-state.camp.x,z-state.camp.z)<11.5)continue;
+      if(l>=17&&r<.65){
+        // Faceted outcrops use the existing rock batch, rooted below the surface.
+        // High summits get a few elongated crags rather than extra mesh objects.
+        const crag=l>=23?1+(l-22)*.6:1;
+        put(this.rocks,x,y+.15,z,(.6+r)*Math.sqrt(crag),(r+.6)*crag*1.8,(.7+r)*Math.sqrt(crag));continue;
+      }
       // Plant roots on a whole terrace, never floating across a sculpted edge.
       if([[.65,0],[-.65,0],[0,.65],[0,-.65]].some(([dx,dz])=>this.terrain.level(x+dx,z+dz)!==l))continue;
-      if(l>=17&&r<.65){put(this.rocks,x,y+.24,z,.6+r,r+.6,.7+r);continue;}
       const grove=Math.sin(x*.14)+Math.cos(z*.19)+Math.sin((x+z)*.08);
       const biome=vegetationBiome(x,z);
       const sand=l<9||desertWeight(x,z)>.65||(biome==='palm'&&l<13);
-      if(sand){
-        if(l>=7&&(l<=11||biome==='palm')&&r<.32&&grove>-.5){
+      if(sand||l<13&&r<.08&&grove>.5){
+        if(l>=7&&(l<=12||biome==='palm')&&r<.32&&grove>-.5){
           const s=.9+random()*.5,angle=random()*Math.PI*2;
           put(this.trunks,x,y+1.12*s,z,.8*s,1.72*s,.8*s,'#957447');
-          for(let n=0;n<6;n++)put(this.palms,x,y+2.2*s,z,s,s,s,n%2?'#6b994d':'#8ba94d',angle+n*Math.PI/3);
+          for(let n=0;n<6;n++)put(this.palms,x,y+2.2*s,z,s,s,s,n%2?'#568f2d':'#9abd3f',angle+n*Math.PI/3);
         }else if(l>=7&&r<.15){put(this.bushes,x,y+.22,z,.45,.28,.4,'#b0b46e');}
         continue;
       }
@@ -133,15 +138,15 @@ export class Landscape {
         const s=.85+random()*.75;
         const bark=biome==='birch'?'#e1dcca':'#806044';
         put(this.trunks,x,y+.75*s,z,s,1.15*s,s,bark);
-        if(biome==='pine'||l>=13&&!biome){
+        if(biome==='pine'&&l>=15){
           for(let tier=0;tier<4;tier++){const spread=1-tier*.19;put(this.pines,x,y+(1.45+tier*.55)*s,z,spread*s,.65*s,spread*s,tier%2?'#528455':'#3f704e');}
         }else if(biome==='acacia'){
           for(const dx of [-.7,.65]){
             branch(x,y+1.0*s,z,dx*s,1.05*s,.13*s,.55*s,bark);
-            put(this.crowns,x+dx*s,y+2.1*s,z+.13*s,1.15*s,.4*s,.85*s,'#7e994c');
+            put(this.crowns,x+dx*s,y+2.1*s,z+.13*s,1.15*s,.4*s,.85*s,'#729a36');
           }
         }else{
-          const tint=biome==='birch'?'#bed174':biome==='autumn'?(r<.35?'#d39e3f':'#ba783b'):biome==='blossom'?(r<.35?'#d588a4':'#b97598'):['#638d49','#719d51','#809f54'][Math.floor(random()*3)];
+          const tint=biome==='birch'?'#9bbb4c':biome==='autumn'?(r<.35?'#a3b84d':'#7d9d39'):biome==='blossom'?(r<.35?'#95b645':'#659438'):['#4e852b','#6c9e32','#8eb33d'][Math.floor(random()*3)];
           // Narrow cypress silhouettes punctuate the meadow groves.
           if(!biome&&r<.09){put(this.crowns,x,y+2.25*s,z,.42*s,1.5*s,.42*s,'#658e42');}
           else{
