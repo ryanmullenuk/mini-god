@@ -1,3 +1,4 @@
+import {legacySave} from './save-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {test,after} from 'node:test';
 import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
@@ -120,9 +121,9 @@ test('pending guidance and construction resume after saving without duplicate bu
     run(a,4.3);const saved=decodeSave(encodeSave(terrain.values,a.state));assert.ok(saved.world.orders.length>0);
     restoredTerrain.values.set(saved.terrain);const b=new Settlement(restoredTerrain,saved.world);
     run(a,160);run(b,160);assert.deepEqual(a.state,b.state);conserved(a);conserved(b);
-    const invalid=JSON.parse(encodeSave(terrain.values,a.state));invalid.version=99;assert.throws(()=>decodeSave(JSON.stringify(invalid)));
-    const older=JSON.parse(encodeSave(terrain.values,a.state));older.version=2;delete older.world.orders;
-    const upgraded=decodeSave(JSON.stringify(older));assert.equal(upgraded.version,17);assert.deepEqual(upgraded.world.orders,[]);
+    const invalid=JSON.parse(legacySave(terrain.values,a.state));invalid.version=99;assert.throws(()=>decodeSave(JSON.stringify(invalid)));
+    const older=JSON.parse(legacySave(terrain.values,a.state));older.version=2;delete older.world.orders;
+    const upgraded=decodeSave(JSON.stringify(older));assert.equal(upgraded.version,18);assert.deepEqual(upgraded.world.orders,[]);
     assert.deepEqual(upgraded.world.plots,older.world.plots);
   }finally{terrain.dispose();restoredTerrain.dispose();}
 });

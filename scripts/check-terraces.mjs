@@ -1,3 +1,5 @@
+import {assertTerrain} from './save-fixtures.mjs';
+import {legacySave} from './save-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {test,after} from 'node:test';
 import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
@@ -147,9 +149,9 @@ test('legacy saves retain village foundations, crops, cargo and supplies during 
     assert.ok(sim.state.plots.length>=2);
     // All these samples were one old terrace, but now straddle two new levels.
     for(let j=0;j<GRID;j++)for(let i=0;i<GRID;i++)terrain.values[j*GRID+i]=6.65+.7*i/(GRID-1);
-    const legacy=JSON.parse(encodeSave(terrain.values,sim.state));legacy.version=1;
+    const legacy=JSON.parse(legacySave(terrain.values,sim.state));legacy.version=1;
     const restored=decodeSave(JSON.stringify(legacy));
-    assert.equal(restored.version,17);assert.equal(restored.migratedFrom,1);
+    assert.equal(restored.version,18);assert.equal(restored.migratedFrom,1);
     assert.equal(restored.world.foodSystem.initialized,false,'Legacy saves receive an unseeded food system');
     const {foodSystem:_oldFood,...oldEconomy}=legacy.world,{foodSystem:_newFood,...restoredEconomy}=restored.world;
     assert.deepEqual(restoredEconomy,oldEconomy,'Upgrading geometry must not rewrite the existing economy');
@@ -159,6 +161,6 @@ test('legacy saves retain village foundations, crops, cargo and supplies during 
     assert.equal(resumed.state.food,legacy.world.food);assert.equal(resumed.state.wood,legacy.world.wood);
     assert.deepEqual(resumed.state.settlers.map(s=>s.cargo),legacy.world.settlers.map(s=>s.cargo));
     const roundtrip=decodeSave(encodeSave(terrain.values,resumed.state));
-    assert.equal(roundtrip.migratedFrom,undefined);assert.deepEqual(roundtrip.terrain,Array.from(terrain.values));
+    assert.equal(roundtrip.migratedFrom,undefined);assertTerrain(roundtrip.terrain,Array.from(terrain.values));
   }finally{terrain.dispose();}
 });

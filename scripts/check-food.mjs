@@ -1,3 +1,4 @@
+import {legacySave} from './save-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {test,after} from 'node:test';
 import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
@@ -93,7 +94,7 @@ test('new saves resume catch jobs, training and breeding without duplicate anima
   const coop=pen(s,'coop',6,5);coop.stock=2;coop.keeperId=s.state.settlers[0].id;for(const a of s.state.foodSystem.animals)a.alive=false;
   s.state.wood=2;s.foodSystem.train(s.state.settlers[1].id);run(s,8);
   const saved=decodeSave(encodeSave(t.values,s.state));t2.values.set(saved.terrain);const restored=new Settlement(t2,saved.world);run(s,100);run(restored,100);assert.deepEqual(s.state,restored.state);
-  const invalid=JSON.parse(encodeSave(t.values,s.state));invalid.world.plots.find(p=>p.kind==='coop').stock=99;assert.throws(()=>decodeSave(JSON.stringify(invalid)));
+  const invalid=JSON.parse(legacySave(t.values,s.state));invalid.world.plots.find(p=>p.kind==='coop').stock=99;assert.throws(()=>decodeSave(JSON.stringify(invalid)));
  }finally{t.dispose();t2.dispose();}
 });
 test('blocked delivery retains animal cargo and releases claims through sculpting and save restore',()=>{
@@ -124,7 +125,7 @@ test('food save validation rejects duplicate claims, over-capacity cargo and unt
    a=>{a.world.plots.find(a=>a.id===p.id).stock=8;a.world.settlers[0].cargo.animal={species:'chicken',destination:p.id};},
    a=>{a.world.foodSystem.fishing=[{id:a.world.nextId++,x:0,z:0,water:{x:0,z:1},stock:13,recovery:0,workerId:null,claimedBy:null}];}
   ]){const a=JSON.parse(raw);mutate(a);assert.throws(()=>decodeSave(JSON.stringify(a)));}
-  const legacy=JSON.parse(raw);legacy.version=6;delete legacy.world.foodSystem;const restored=decodeSave(JSON.stringify(legacy));assert.equal(restored.world.foodSystem.initialized,false);assert.deepEqual(restored.world.settlers,s.state.settlers);
+  const legacy=JSON.parse(legacySave(t.values,s.state));legacy.version=6;delete legacy.world.foodSystem;const restored=decodeSave(JSON.stringify(legacy));assert.equal(restored.world.foodSystem.initialized,false);assert.deepEqual(restored.world.settlers,s.state.settlers);
  }finally{t.dispose();}
 });
 test('fish visuals reflect exact stock, depleted areas hide fish, and view geometry disposes',async()=>{

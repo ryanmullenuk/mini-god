@@ -28,8 +28,8 @@ export class Settlement {
   private needDiscovery=true;
   private orderMessages=new Map<number,string>();
 
-  constructor(readonly terrain:Terrain,state?:WorldState){
-    this.state=state??newWorld();this.metadata=new TerrainMetadata(terrain);
+  constructor(readonly terrain:Terrain,state?:WorldState,createWaterWorker?:()=>Worker){
+    this.state=state??newWorld();this.metadata=new TerrainMetadata(terrain,undefined,createWaterWorker);
     this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='farm'&&p.valid&&Math.abs(x-p.x)<1.32&&Math.abs(z-p.z)<1.32));
     this.foodSystem=new FoodSystem(()=>this.state,terrain,this.nav,(w,k,id,p)=>this.assign(w,k,id,p),w=>this.release(w));
   }
@@ -241,8 +241,8 @@ export class Settlement {
     for(const n of this.state.resources)if(n.claimedBy===w.id)n.claimedBy=null;
     w.job=null;w.moving=false;
   }
-  terrainChanged(){
-    this.metadata.invalidate();this.nav.invalidate();
+  terrainChanged(waterChanged=true){
+    if(waterChanged)this.metadata.invalidate();this.nav.invalidate();
     for(const p of this.state.plots)p.valid=this.physicalPlot(p,p.kind);
     for(const n of this.state.resources)n.valid=this.terrain.level(n.x,n.z)>=FIRST_DRY_LAYER&&this.nav.safe(n.x,n.z);
     this.nav.invalidate();

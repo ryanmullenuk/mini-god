@@ -1,23 +1,60 @@
-import { GRID, EXTENT, STEP, layerThreshold, mainlandHeight, archipelagoHeight, legacyArchipelagoHeight, naturalArchipelagoHeight, woodedArchipelagoHeight, mountainArchipelagoHeight, waterfallArchipelagoHeight, miniGodArchipelagoHeight, broadMainlandHeight, LAYER_COUNT } from './terrain';
+import { GRID, EXTENT, STEP, layerThreshold, mainlandHeight, archipelagoHeight, legacyArchipelagoHeight, naturalArchipelagoHeight, woodedArchipelagoHeight, mountainArchipelagoHeight, waterfallArchipelagoHeight, miniGodArchipelagoHeight, broadMainlandHeight, LAYER_COUNT, scalarLevel } from './terrain';
 import { validFoodSave } from './food-save';
 import { FOOD_JOBS } from './food-system';
 import { newFoodState, ORDER_LIMIT, VILLAGE_BALANCE as V, constructionCost, type WorldState } from './world-state';
 
 export const SAVE_KEY='tide.living-island.v1';
-export type IslandSave={format:'tide-island';version:17;savedAt:string;terrain:number[];world:WorldState;migratedFrom?:1;archipelagoUpgraded?:boolean};
+export type IslandSave={format:'tide-island';version:18;savedAt:string;terrain:number[];world:WorldState;migratedFrom?:1;archipelagoUpgraded?:boolean};
 const record=(v:unknown):v is Record<string,unknown>=>typeof v==='object'&&v!==null&&!Array.isArray(v);
 const finite=(v:unknown,min=-1e6,max=1e6):v is number=>typeof v==='number'&&Number.isFinite(v)&&v>=min&&v<=max;
 const integer=(v:unknown,min=0,max=1e9):v is number=>finite(v,min,max)&&Number.isInteger(v);
 const point=(v:unknown)=>record(v)&&finite(v.x,-EXTENT/2,EXTENT/2)&&finite(v.z,-EXTENT/2,EXTENT/2);
 function fail():never{throw new Error('This file is not a valid Mini God island save. Your current island has been kept.');}
 
-export function encodeSave(terrain:Float32Array,world:WorldState){
-  return JSON.stringify({format:'tide-island',version:17,savedAt:new Date().toISOString(),terrain:Array.from(terrain),world} satisfies IslandSave);
+const HEIGHT_SCALE=1000;
+/** Little-endian Int16, with boundary-aware rounding so a stored sample never
+ * changes its terrace. The payload is portable between browser architectures. */
+export function encodeTerrain(terrain:Float32Array){
+  if(terrain.length!==GRID*GRID)fail();
+  const bytes=new Uint8Array(terrain.length*2),view=new DataView(bytes.buffer);
+  for(let i=0;i<terrain.length;i++){
+    const value=terrain[i];if(!finite(value,-2,.5+(LAYER_COUNT-1)*.5+.351))fail();
+    let q=Math.round(value*HEIGHT_SCALE);
+    const level=scalarLevel(value),rounded=scalarLevel(q/HEIGHT_SCALE);
+    if(rounded>level)q--;else if(rounded<level)q++;
+    view.setInt16(i*2,q,true);
+  }
+  let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+  return btoa(binary);
+}
+function decodeTerrain(encoded:string){
+  if(encoded.length!==Math.ceil(GRID*GRID*2/3)*4||!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded))fail();
+  let binary:string;try{binary=atob(encoded);}catch{fail();}
+  if(binary.length!==GRID*GRID*2)fail();
+  const values=new Array<number>(GRID*GRID);
+  for(let i=0;i<values.length;i++){
+    const q=binary.charCodeAt(i*2)|(binary.charCodeAt(i*2+1)<<8);
+    values[i]=Math.fround((q>=32768?q-65536:q)/HEIGHT_SCALE);
+  }
+  return values;
+}
+function encodedSave(terrain:string,world:WorldState){
+  return JSON.stringify({format:'tide-island',version:18,savedAt:new Date().toISOString(),terrain,world});
+}
+export function encodeSave(terrain:Float32Array,world:WorldState){return encodedSave(encodeTerrain(terrain),world);}
+/** Revision is advanced by every edit, undo, import and touch rollback. */
+export function createSaveEncoder(){
+  let last:Float32Array|undefined,revision=-1,encoded='';
+  return (terrain:Float32Array,world:WorldState,nextRevision:number)=>{
+    if(last!==terrain||revision!==nextRevision){encoded=encodeTerrain(terrain);last=terrain;revision=nextRevision;}
+    return encodedSave(encoded,world);
+  };
 }
 export function decodeSave(raw:string):IslandSave{
   if(raw.length>8_000_000)fail();
   let parsed:unknown;try{parsed=JSON.parse(raw);}catch{fail();}
-  if(!record(parsed)||parsed.format!=='tide-island'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17].includes(parsed.version as number)||typeof parsed.savedAt!=='string'||!Array.isArray(parsed.terrain)||!(parsed.terrain.length===GRID*GRID||(parsed.version as number)<6&&parsed.terrain.length===200*200)||!parsed.terrain.every(v=>finite(v,-2,.5+(LAYER_COUNT-1)*.5+.351))||!record(parsed.world))return fail();
+  if(record(parsed)&&parsed.version===18){if(typeof parsed.terrain!=='string')fail();parsed.terrain=decodeTerrain(parsed.terrain);}
+  if(!record(parsed)||parsed.format!=='tide-island'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18].includes(parsed.version as number)||typeof parsed.savedAt!=='string'||!Array.isArray(parsed.terrain)||!(parsed.terrain.length===GRID*GRID||(parsed.version as number)<6&&parsed.terrain.length===200*200)||!parsed.terrain.every(v=>finite(v,-2,.5+(LAYER_COUNT-1)*.5+.351))||!record(parsed.world))return fail();
   if(parsed.terrain.length===200*200){
     const expanded=Array.from({length:GRID*GRID},()=>-2),offset=(GRID-200)/2;
     for(let j=0;j<200;j++)for(let i=0;i<200;i++)expanded[(j+offset)*GRID+i+offset]=parsed.terrain[j*200+i];
@@ -183,6 +220,6 @@ export function decodeSave(raw:string):IslandSave{
       if(Math.abs(next-save.terrain[k])>.00001){save.terrain[k]=next;save.archipelagoUpgraded=true;}
     }
   }
-  save.version=17;
+  save.version=18;
   return save;
 }

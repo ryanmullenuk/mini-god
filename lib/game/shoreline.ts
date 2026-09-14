@@ -13,7 +13,30 @@ export class Shoreline {
   private sea=new Uint8Array(GRID*GRID);
   private queue=new Int32Array(GRID*GRID);
   private version=-1;
-  constructor(private terrain:Terrain){
+  private worker:Worker|null=null;
+  private active=false;
+  private pending:{id:number;values:Float32Array}|null=null;
+  private disposed=false;
+  constructor(private terrain:Pick<Terrain,'values'|'texture'>,background=typeof window!=='undefined',
+    createWorker=()=>new Worker(new URL('./shoreline-worker.ts',import.meta.url),{type:'module'})){
+    if(background){try{
+      this.worker=createWorker();
+      this.worker.onmessage=e=>{
+        if(this.disposed)return;
+        this.active=false;
+        const result=e.data;
+        if(result.id===this.version){
+          this.distances.set(result.distances);this.shelfDepths.set(result.shelfDepths);this.sea.set(result.sea);
+          this.texture.needsUpdate=true;this.shelfTexture.needsUpdate=true;
+        }
+        this.pump();
+      };
+      // Retain the last valid visual shelf if a worker fails. Navigation and
+      // gameplay water metadata are independent and still use live terrain.
+      this.worker.onerror=()=>{this.worker?.terminate();this.worker=null;this.active=false;this.pending=null;};
+      this.distances.fill(1000);this.shelfDepths.fill(1);
+    }catch{this.worker=null;}}
+
     this.texture.minFilter=THREE.LinearFilter;this.texture.magFilter=THREE.LinearFilter;
     this.shelfTexture.minFilter=THREE.LinearFilter;this.shelfTexture.magFilter=THREE.LinearFilter;
     this.update();
@@ -22,6 +45,7 @@ export class Shoreline {
   update(){
     if(this.version===this.terrain.texture.version)return;
     this.version=this.terrain.texture.version;
+    if(this.worker){this.pending={id:this.version,values:this.terrain.values.slice()};this.pump();return;}
     const d=this.distances,sea=this.sea,values=this.terrain.values,threshold=layerThreshold(FIRST_DRY_LAYER);
     sea.fill(0);let head=0,tail=0;
     const enqueue=(k:number)=>{if(!sea[k]&&values[k]<threshold){sea[k]=1;this.queue[tail++]=k;}};
@@ -65,5 +89,12 @@ export class Shoreline {
     for(let k=0;k<d.length;k++)d[k]=sea[k]?Math.max(0,d[k]-STEP*.5):values[k]>=threshold?0:1000;
     this.texture.needsUpdate=true;this.shelfTexture.needsUpdate=true;
   }
-  dispose(){this.texture.dispose();this.shelfTexture.dispose();}
+  private pump(){
+    if(this.active||!this.pending||!this.worker||this.disposed)return;
+    const request=this.pending;this.pending=null;this.active=true;
+    this.worker.postMessage(request,[request.values.buffer]);
+  }
+  /** Worker result contains only render/marine fields, never terrain geometry. */
+  snapshot(){return {distances:this.distances,shelfDepths:this.shelfDepths,sea:this.sea};}
+  dispose(){this.disposed=true;this.worker?.terminate();this.pending=null;this.texture.dispose();this.shelfTexture.dispose();}
 }
