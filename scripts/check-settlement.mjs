@@ -109,3 +109,29 @@ test('settlement state drives the existing islander rigs and new scene geometry'
     people.clear();assert.equal(people.people.length,0);people.sync(sim.state.settlers,.1,true);assert.equal(people.people.length,2);
   }finally{view.dispose();people.dispose();terrain.dispose();}
 });
+
+test('local sculpt preserves unrelated jobs, reservations, cargo and work progress',()=>{
+ const terrain=new Terrain();try{
+  terrain.values.fill(6.25);const sim=new Settlement(terrain);sim.add(2);
+  const w=sim.state.settlers[0];w.x=0;w.z=0;
+  const node=sim.state.resources[0];node.x=4;node.z=0;node.valid=true;node.claimedBy=w.id;
+  w.job={kind:node.kind,target:node.id,route:[{x:4,z:0}],work:2};w.moving=true;
+  const job=w.job,cargo=structuredClone(w.cargo);
+  sim.terrainChanged(false,{minX:30,maxX:34,minZ:30,maxZ:34});
+  assert.equal(w.job,job);assert.equal(w.job.work,2);assert.equal(w.moving,true);assert.equal(node.claimedBy,w.id);assert.deepEqual(w.cargo,cargo);
+  // Even an intersecting edit should retain safe journeys without resetting work.
+  sim.terrainChanged(false,{minX:1,maxX:3,minZ:-1,maxZ:1});
+  assert.equal(w.job,job);assert.equal(w.job.work,2);assert.equal(node.claimedBy,w.id);
+ }finally{terrain.dispose();}
+});
+test('local sculpt releases an unreachable job but preserves carried food',()=>{
+ const terrain=new Terrain();try{
+  terrain.values.fill(6.25);const sim=new Settlement(terrain);sim.add(2);
+  const w=sim.state.settlers[0];w.x=0;w.z=0;w.cargo.food=3;
+  const node=sim.state.resources[0];node.x=4;node.z=0;node.valid=true;node.claimedBy=w.id;
+  w.job={kind:node.kind,target:node.id,route:[{x:4,z:0}],work:2};
+  const original=terrain.level.bind(terrain);terrain.level=(x,z)=>x>2?0:original(x,z);
+  sim.terrainChanged(false,{minX:2,maxX:8,minZ:-5,maxZ:5});
+  assert.equal(w.job,null);assert.equal(node.claimedBy,null);assert.equal(w.cargo.food,3);assert.ok(sim.nav.safe(w.x,w.z));
+ }finally{terrain.dispose();}
+});
