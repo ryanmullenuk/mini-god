@@ -241,13 +241,27 @@ export class Settlement {
     for(const n of this.state.resources)if(n.claimedBy===w.id)n.claimedBy=null;
     w.job=null;w.moving=false;
   }
-  terrainChanged(waterChanged=true){
+  terrainChanged(waterChanged=true,bounds?:{minX:number;maxX:number;minZ:number;maxZ:number}){
     if(waterChanged)this.metadata.invalidate();this.nav.invalidate();
     for(const p of this.state.plots)p.valid=this.physicalPlot(p,p.kind);
     for(const n of this.state.resources)n.valid=this.terrain.level(n.x,n.z)>=FIRST_DRY_LAYER&&this.nav.safe(n.x,n.z);
     this.nav.invalidate();
+    const touches=(a:Point,b:Point=a)=>!bounds||Math.max(a.x,b.x)>=bounds.minX&&Math.min(a.x,b.x)<=bounds.maxX&&Math.max(a.z,b.z)>=bounds.minZ&&Math.min(a.z,b.z)<=bounds.maxZ;
     for(const w of this.state.settlers){
-      this.release(w);
+      // Full restoration keeps its conservative reset; local edits preserve jobs,
+      // reservations and work progress unless their actual journey becomes unsafe.
+      if(!bounds)this.release(w);
+      else if(w.job){
+        const target=this.target(w),plot=this.state.plots.find(p=>p.id===w.job!.target),resource=this.state.resources.find(n=>n.id===w.job!.target);
+        let previous:Point=w,affected=touches(w)||!!target&&touches(target);
+        for(const point of w.job.route){affected ||= touches(previous,point);previous=point;}
+        if(!target||plot&&!plot.valid||resource&&!resource.valid)this.release(w);
+        else if(affected){
+          previous=w;let safe=this.nav.safe(w.x,w.z);
+          for(const point of w.job.route){if(!this.nav.segment(previous,point)){safe=false;break;}previous=point;}
+          if(!safe){const route=this.nav.route(w,target);if(route)w.job.route=route;else this.release(w);}
+        }
+      }
       // Recovery retains carried goods; storage changes only after a real return trip.
       if(!this.nav.safe(w.x,w.z)){
         const dry=this.nav.nearest(w,3);
