@@ -8,7 +8,7 @@ export class FoodView {
  private fish:THREE.InstancedMesh;private dummy=new THREE.Object3D();
  constructor(private terrain:Terrain){
   const shape=new THREE.IcosahedronGeometry(.17,0);shape.scale(.6,.5,1.8);
-  this.fish=new THREE.InstancedMesh(shape,new THREE.MeshLambertMaterial({color:'#eeb862'}),B.fishing.capacity*B.fishing.maxAreas);this.fish.count=0;this.fish.frustumCulled=false;this.group.add(this.fish);
+  this.fish=new THREE.InstancedMesh(shape,new THREE.MeshLambertMaterial({color:'#eeb862',transparent:true,opacity:.72,depthWrite:false}),B.fishing.capacity*B.fishing.maxAreas);this.fish.renderOrder=3;this.fish.count=0;this.fish.frustumCulled=false;this.group.add(this.fish);
  }
  private box(g:THREE.Group,x:number,y:number,z:number,px:number,py:number,pz:number,color:string){const m=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),new THREE.MeshLambertMaterial({color}));m.position.set(px,py,pz);g.add(m);return m;}
  update(s:WorldState){
