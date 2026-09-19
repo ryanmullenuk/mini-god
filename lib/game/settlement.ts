@@ -35,7 +35,8 @@ export class Settlement {
     this.foodSystem=new FoodSystem(()=>this.state,terrain,this.nav,(w,k,id,p)=>this.assign(w,k,id,p),w=>this.release(w));
   }
   private event(message:string){this.state.lastEvent=message;this.state.eventTime=this.state.time;}
-  get raining(){return this.state.rain>0||(this.state.time%360>=310&&this.state.time%360<335);}
+  get naturalRaining(){return this.naturalRain();}
+  get raining(){return this.state.rain>0||this.naturalRaining;}
   get capacity(){return this.state.plots.filter(p=>p.kind==='home'&&p.stage==='complete'&&p.valid).reduce((n,p)=>n+homeCapacity(p),0);}
   get storage(){return {food:V.campFood+this.state.plots.filter(p=>p.kind==='granary'&&p.stage==='complete'&&p.valid).length*V.granaryFood,wood:V.campWood+this.state.plots.filter(p=>p.kind==='storehouse'&&p.stage==='complete'&&p.valid).length*V.storehouseWood};}
   upgradeHome(id:number){
@@ -447,7 +448,12 @@ export class Settlement {
     const s=this.state,bonus=Math.min(8,Math.min(this.capacity,s.settlers.length));
     return [...(s.camp?[{...s.camp,radius:18+bonus}]:[]),...s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').map(p=>({x:p.x,z:p.z,radius:18+bonus+(s.tier===2?6:0)}))];
   }
-  private naturalRain(){return this.state.time%360>=310&&this.state.time%360<335;}
+  private naturalRain(){
+    const cycle=Math.floor(this.state.time/240),within=this.state.time-cycle*240;
+    const random=(((Math.imul(cycle+17,1103515245)+12345)>>>0)/4294967296);
+    const start=125+random*70,duration=22+random*18;
+    return within>=start&&within<start+duration;
+  }
   wetAt(p:Point){const s=this.state;return this.naturalRain()||s.rain>0&&(!s.rainArea||distance(p,s.rainArea)<=s.rainArea.radius);}
   private powerPreview(kind:'rain'|'bloom',p:Point):GuidancePreview{
     const radius=this.state.tier===2?8:6;
@@ -495,7 +501,7 @@ export class Settlement {
     if(this.capacity>=s.settlers.length&&s.food>s.settlers.length*3)s.faith=Math.min(500,s.faith+dt*s.settlers.length*.008);
 
     for(const n of s.resources)if(n.valid&&n.stock<n.capacity){
-      n.regrowth+=dt*(this.wetAt(n)?1.5:1);
+      n.regrowth+=dt*(this.naturalRaining&&n.kind==='wood'?2.5:this.wetAt(n)?1.5:1);
       if(n.regrowth>=45){n.regrowth-=45;n.stock=Math.min(n.capacity,n.stock+1);}
     }
     for(const p of s.plots)if(p.kind==='farm'&&p.valid){

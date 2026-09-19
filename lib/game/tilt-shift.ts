@@ -11,8 +11,8 @@ export class TiltShift {
     vertexShader:'varying vec2 uvScreen; void main(){uvScreen=uv;gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader:`uniform sampler2D image;uniform vec2 pixel;varying vec2 uvScreen;
     void main(){
-      float focus=smoothstep(.20,.50,abs(uvScreen.y-.52));
-      vec2 r=pixel*focus*2.4;
+      float focus=smoothstep(.11,.37,abs(uvScreen.y-.52));
+      vec2 r=pixel*focus*4.1;
       vec4 c=texture2D(image,uvScreen)*.28;
       c+=(texture2D(image,uvScreen+vec2(r.x,0.))+texture2D(image,uvScreen-vec2(r.x,0.))+
           texture2D(image,uvScreen+vec2(0.,r.y))+texture2D(image,uvScreen-vec2(0.,r.y)))*.12;

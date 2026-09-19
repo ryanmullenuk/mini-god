@@ -135,3 +135,16 @@ test('local sculpt releases an unreachable job but preserves carried food',()=>{
   assert.equal(w.job,null);assert.equal(node.claimedBy,null);assert.equal(w.cargo.food,3);assert.ok(sim.nav.safe(w.x,w.z));
  }finally{terrain.dispose();}
 });
+
+test('natural island-wide storms vary by cycle and accelerate tree regrowth',()=>{
+  const terrain=new Terrain();terrain.values.fill(7.2);const sim=new Settlement(terrain);sim.add(2);try{
+    sim.state.resources=[{id:sim.state.nextId++,kind:'wood',x:1,z:1,stock:0,capacity:12,regrowth:0,claimedBy:null,valid:true}];
+    let waited=0;while(!sim.naturalRaining&&waited<240){sim.advance(.1);waited+=.1;}
+    assert.ok(sim.naturalRaining,'A storm arrives within each weather cycle');
+    const start=sim.state.resources[0].regrowth;run(sim,10);
+    assert.ok(sim.state.resources[0].regrowth-start>=24,'Rain accelerates tree resource regrowth');
+    const firstStart=waited;while(sim.naturalRaining)sim.advance(.1);
+    waited=0;while(!sim.naturalRaining&&waited<240){sim.advance(.1);waited+=.1;}
+    assert.ok(Math.abs(waited-firstStart)>1,'Storm timing varies between cycles');
+  }finally{terrain.dispose();}
+});
