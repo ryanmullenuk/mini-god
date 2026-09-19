@@ -154,3 +154,49 @@ test('placement previews are read-only and reuse visible geometry for huts and f
     cursor.show(null);assert.equal(cursor.group.visible,false);assert.deepEqual(sim.state,before);assert.deepEqual(terrain.values,values);
   }finally{cursor.dispose();terrain.dispose();}
 });
+
+test('fire buildings use supplied construction and survive saves',()=>{
+  const {terrain,sim}=flat();try{
+    sim.state.wood=40;sim.state.food=200;
+    for(const [kind,x] of [['torch',8],['bonfire',13]]){
+      assert.ok(sim.guide(kind,{x:sim.state.camp.x+x,z:sim.state.camp.z}).allowed);
+    }
+    run(sim,180);
+    for(const kind of ['torch','bonfire'])assert.equal(sim.state.plots.find(p=>p.kind===kind)?.stage,'complete');
+    const restored=decodeSave(encodeSave(terrain.values,sim.state));
+    assert.equal(restored.world.plots.filter(p=>['torch','bonfire'].includes(p.kind)).length,2);
+    const view=new SettlementView(terrain);view.update(sim,false,false);
+    assert.equal(view.group.children.filter(x=>x.isPointLight).length,4);
+    view.dispose();
+  }finally{terrain.dispose();}
+});
+
+test('evening bonfire gathering preserves nonexclusive jobs and ends at dawn',()=>{
+  const {terrain,sim}=flat();try{
+    sim.state.food=200;sim.state.wood=100;
+    sim.state.time=160;sim.state.tick=1600;
+    const p={...sim.state.camp,x:sim.state.camp.x+7,id:sim.state.nextId++,kind:'bonfire',stage:'complete',progress:1,valid:true,claimedBy:null,moisture:.5,fertility:.5,crop:0,planted:false,harvests:0};
+    sim.state.plots.push(p);sim.nav.invalidate();
+    for(const w of sim.state.settlers)sim.decide(w);
+    assert.equal(sim.state.settlers.filter(w=>w.job?.kind==='gather').length,2);
+    assert.equal(p.claimedBy,null);
+    assert.doesNotThrow(()=>decodeSave(encodeSave(terrain.values,sim.state)));
+    sim.state.time=240;sim.state.tick=2400;sim.advance(.1);
+    assert.ok(sim.state.settlers.every(w=>w.job?.kind!=='gather'));
+  }finally{terrain.dispose();}
+});
+
+test('bonfires cannot draw followers through blocked routes, in daylight, or when hungry',()=>{
+  const {terrain,sim}=flat();try{
+    sim.state.food=200;sim.state.wood=100;
+    sim.state.plots.push({...sim.state.camp,x:sim.state.camp.x+7,id:sim.state.nextId++,kind:'bonfire',stage:'complete',progress:1,valid:true,claimedBy:null,moisture:.5,fertility:.5,crop:0,planted:false,harvests:0});
+    for(const w of sim.state.settlers)sim.decide(w);
+    assert.ok(sim.state.settlers.every(w=>w.job?.kind!=='gather'));
+    sim.state.time=160;sim.state.tick=1600;sim.nav.route=()=>null;
+    for(const w of sim.state.settlers){w.job=null;sim.decide(w);}
+    assert.ok(sim.state.settlers.every(w=>w.job?.kind!=='gather'));
+    sim.state.food=0;
+    for(const w of sim.state.settlers){w.job=null;sim.decide(w);}
+    assert.ok(sim.state.settlers.every(w=>w.job?.kind!=='gather'));
+  }finally{terrain.dispose();}
+});

@@ -1,3 +1,4 @@
+import { DAY_SECONDS } from './world-state';
 import {FOOD_BALANCE as B} from './food-balance';
 import * as THREE from 'three';
 import { SEA, type Terrain } from './terrain';
@@ -22,7 +23,9 @@ export class SettlementView {
   private dummy=new THREE.Object3D();
   private materialCache=new Map<string,THREE.MeshLambertMaterial>();
   private opportunityKey='';
+  private fireLights=Array.from({length:4},()=>new THREE.PointLight('#ffae51',0,7,2));
   constructor(private terrain:Terrain){
+    this.group.add(...this.fireLights);
     this.group.add(this.camp,this.opportunities,this.beacon,this.influence);
     const beaconMaterial=new THREE.MeshBasicMaterial({color:'#fff0a4',transparent:true,opacity:.7,depthWrite:false});
     this.beaconGlow=new THREE.Mesh(new THREE.OctahedronGeometry(.3),beaconMaterial);this.beaconGlow.position.y=2.8;this.beacon.add(this.beaconGlow);
@@ -54,7 +57,23 @@ export class SettlementView {
   }
   private makePlot(p:Plot){
     const root=new THREE.Group(),building=new THREE.Group(),crops=new THREE.Group(),animals=new THREE.Group();root.add(building,crops,animals);
-    if(p.kind==='home'){building.scale.setScalar(B.visuals.hut);
+    if(p.kind==='torch'||p.kind==='bonfire'){
+      const torch=p.kind==='torch',base=torch?1.05:.22;
+      if(torch){
+        this.mesh(building,new THREE.CylinderGeometry(.045,.065,1.1,6),'#90603c',0,.55,0);
+        this.mesh(building,new THREE.CylinderGeometry(.13,.07,.22,6),'#614435',0,1.02,0);
+      }else{
+        for(let i=0;i<10;i++){const a=i*Math.PI/5;this.mesh(building,new THREE.IcosahedronGeometry(.15,0),'#8a8a7b',Math.sin(a)*.6,.12,Math.cos(a)*.6);}
+        for(let i=0;i<3;i++){const log=this.mesh(building,new THREE.CylinderGeometry(.08,.1,.9,6),'#785138',0,.16,0);log.rotation.set(Math.PI/2,0,i*Math.PI/3);}
+      }
+      const fire=new THREE.Group();fire.name='fire';fire.position.y=base;building.add(fire);
+      for(let i=0;i<3;i++){
+        const flame=new THREE.Mesh(new THREE.ConeGeometry((torch?.1:.22)*(1-i*.22),(torch?.35:.6)*(1-i*.2),5),new THREE.MeshBasicMaterial({color:['#ff702e','#ffba4f','#fff2ac'][i],toneMapped:false}));
+        flame.position.set((i-1)*.035,.15+i*.02,0);fire.add(flame);
+      }
+      const halo=new THREE.Mesh(new THREE.CircleGeometry(torch?.65:1.35,24),new THREE.MeshBasicMaterial({color:'#ffb951',transparent:true,opacity:.12,depthWrite:false,toneMapped:false}));
+      halo.name='fire-halo';halo.rotation.x=-Math.PI/2;halo.position.y=.035;building.add(halo);
+    }else if(p.kind==='home'){building.scale.setScalar(B.visuals.hut);
       this.box(building,1.85,.11,1.85,'#9e825c',0,.04,0);
       this.box(building,1.6,1.15,1.5,'#d8c28c',0,.65,-.08);
       this.box(building,.48,.85,.04,'#4d5844',0,.47,.685);
@@ -172,11 +191,25 @@ export class SettlementView {
       root.position.set(order.x,Math.max(SEA+.1,this.terrain.height(order.x,order.z))+.035,order.z);
     }
     this.camp.visible=!!s.camp;if(s.camp)this.camp.position.set(s.camp.x,Math.max(SEA,this.terrain.height(s.camp.x,s.camp.z)),s.camp.z);
+    const phase=(s.time%DAY_SECONDS)/DAY_SECONDS;
+    const fireStrength=THREE.MathUtils.smoothstep(phase,.54,.70)*(1-THREE.MathUtils.smoothstep(phase,.94,1));
+    let lightIndex=0;
+    for(const light of this.fireLights)light.intensity=0;
     for(const p of s.plots){
       const v=this.plots.get(p.id)??this.makePlot(p),height=Math.max(SEA+.06,this.terrain.height(p.x,p.z));v.root.position.set(p.x,height,p.z);
       v.building.visible=p.valid;
       const complete=p.stage==='complete';
       v.building.scale.y=p.kind==='home'?B.visuals.hut:!complete?.15+p.progress*.85:1;
+      if(p.kind==='torch'||p.kind==='bonfire'){
+        const fire=v.building.getObjectByName('fire')!,halo=v.building.getObjectByName('fire-halo')!;
+        fire.visible=halo.visible=p.valid&&complete&&fireStrength>.01;
+        const flicker=1+Math.sin(s.time*5.3+p.id)*.08+Math.sin(s.time*8.1+p.id*2)*.04;
+        fire.scale.set(1,flicker,1);
+        if(fire.visible&&lightIndex<this.fireLights.length){
+          const light=this.fireLights[lightIndex++];light.position.set(p.x,height+(p.kind==='torch'?1.2:.7),p.z);
+          light.intensity=fireStrength*flicker*(p.kind==='torch'?2:4);
+        }
+      }
       v.animals.visible=p.valid&&complete;v.animals.children.forEach((animal,i)=>{
        animal.visible=i<(p.kind==='coop'||p.kind==='pigpen'?p.stock??0:p.livestock??0);
        if(p.kind==='pigpen'||p.kind==='coop'){
@@ -227,7 +260,7 @@ export class SettlementView {
       positions.needsUpdate=true;
     }
   }
-  private clearGeometry(root:THREE.Object3D){root.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});root.clear();}
+  private clearGeometry(root:THREE.Object3D){root.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const materials=Array.isArray(o.material)?o.material:[o.material];for(const material of materials)if(![...this.materialCache.values()].includes(material))material.dispose();}});root.clear();}
   dispose(){
     const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
     this.group.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Line){geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m);}});

@@ -12,11 +12,11 @@ export type FishingArea = Point & {id:number;water:Point;stock:number;recovery:n
 export type PigTrap = Point & {id:number;phase:'planned'|'armed'|'caught'|'empty';claimedBy:number|null};
 export type FoodState = {initialized:boolean;animals:WildAnimal[];fishing:FishingArea[];traps:PigTrap[];training:number[];hunting:number[];seed:number};
 export const newFoodState=():FoodState=>({initialized:false,animals:[],fishing:[],traps:[],training:[],hunting:[],seed:68129});
-export type JobKind = FoodJob | 'wood' | 'forage' | 'build' | 'plant' | 'harvest' | 'deliver' | 'clear' | 'rally' | 'worship' | 'butcher' | 'supply';
-export type BuildKind = 'home' | 'farm' | 'temple' | 'slaughterhouse' | 'coop' | 'pigpen' | 'granary' | 'storehouse';
-export const BUILD_LABEL: Record<BuildKind,string> = {home:'Hut',farm:'Farm',temple:'Temple',slaughterhouse:'Slaughterhouse',coop:'Chicken coop',pigpen:'Pig pen',granary:'Granary',storehouse:'Storehouse'};
-export const BUILD_TIME = {granary:36,storehouse:32,home:24,farm:15,temple:48,slaughterhouse:36,coop:B.buildings.coop.seconds,pigpen:B.buildings.pigpen.seconds} as const;
-export const BUILD_COST = { granary: 12, storehouse: 10, home: 6, farm: 3, temple: 18, slaughterhouse: 12, coop: B.buildings.coop.wood, pigpen: B.buildings.pigpen.wood } as const;
+export type JobKind = FoodJob | 'wood' | 'forage' | 'build' | 'plant' | 'harvest' | 'deliver' | 'clear' | 'rally' | 'worship' | 'butcher' | 'supply' | 'gather';
+export type BuildKind = 'home' | 'farm' | 'temple' | 'slaughterhouse' | 'coop' | 'pigpen' | 'granary' | 'storehouse' | 'torch' | 'bonfire';
+export const BUILD_LABEL: Record<BuildKind,string> = {torch:'Tiki torch',bonfire:'Bonfire',home:'Hut',farm:'Farm',temple:'Temple',slaughterhouse:'Slaughterhouse',coop:'Chicken coop',pigpen:'Pig pen',granary:'Granary',storehouse:'Storehouse'};
+export const BUILD_TIME = {torch:8,bonfire:16,granary:36,storehouse:32,home:24,farm:15,temple:48,slaughterhouse:36,coop:B.buildings.coop.seconds,pigpen:B.buildings.pigpen.seconds} as const;
+export const BUILD_COST = {torch:2,bonfire:5, granary: 12, storehouse: 10, home: 6, farm: 3, temple: 18, slaughterhouse: 12, coop: B.buildings.coop.wood, pigpen: B.buildings.pigpen.wood } as const;
 export const VILLAGE_BALANCE={hutCapacity:4,cottageCapacity:6,cottageWood:12,cottageSeconds:45,carryWood:3,campFood:240,campWood:120,granaryFood:240,storehouseWood:120} as const;
 export const homeCapacity=(p:Plot)=>p.level===2?VILLAGE_BALANCE.cottageCapacity:VILLAGE_BALANCE.hutCapacity;
 export const constructionCost=(p:Plot)=>p.upgrading?VILLAGE_BALANCE.cottageWood:BUILD_COST[p.kind];
@@ -28,7 +28,7 @@ export type GuidancePreview = Point & { kind: GuidanceKind; allowed: boolean; me
 export type Job = { kind: JobKind; target: number; route: Point[]; work: number; destination?:number; herd?:number[] };
 export type Settler = Point & {
   id: number; name: string; heading: number; moving: boolean; stranded: boolean;
-  lastWorship?: number; huntingSkill?:number; weapon?:boolean;
+  lastGather?: number; lastWorship?: number; huntingSkill?:number; weapon?:boolean;
   job: Job | null; cargo: { wood: number; food: number; harvest: number; animal?: {species:Species;destination:number}; feed?:number; construction?:{site:number;wood:number} };
 };
 export type Plot = Point & {
@@ -79,3 +79,7 @@ export function newWorld(): WorldState {
     deliveredWood: 0, harvestedFood: 0, consumedFood: 0,
     lastEvent: 'An untouched island. Invite your first settlers.', eventTime: 0 };
 }
+
+export const FIRE_BALANCE={guests:6,gatherSeconds:25,gatherCooldown:80,radius:2.2} as const;
+export const evening=(seconds:number)=>['Dusk','Night'].includes(timeOfDay(seconds));
+export const gatheringPoint=(p:Point,id:number):Point=>({x:p.x+Math.sin(id*2.399963)*FIRE_BALANCE.radius,z:p.z+Math.cos(id*2.399963)*FIRE_BALANCE.radius});

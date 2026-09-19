@@ -80,16 +80,17 @@ export function decodeSave(raw:string):IslandSave{
     ids.add(entry.id);
   }
   for(const order of orders){
-    if(!record(order)||!['home','farm','temple','slaughterhouse','coop','pigpen','granary','storehouse'].includes(order.kind as string)||!finite(order.x,-EXTENT/2+2,EXTENT/2-2)||!finite(order.z,-EXTENT/2+2,EXTENT/2-2)||!Number.isInteger(order.x*2)||!Number.isInteger(order.z*2))fail();
+    if(!record(order)||!['home','farm','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(order.kind as string)||!finite(order.x,-EXTENT/2+2,EXTENT/2-2)||!finite(order.z,-EXTENT/2+2,EXTENT/2-2)||!Number.isInteger(order.x*2)||!Number.isInteger(order.z*2))fail();
   }
   for(const w of settlers){
     if(!record(w)||!integer(w.id,1)||typeof w.name!=='string'||w.name.length>40||!finite(w.heading)||typeof w.moving!=='boolean'||typeof w.stranded!=='boolean'||!record(w.cargo))return fail();
+    if(w.lastGather!==undefined&&!finite(w.lastGather,0,s.time))fail();
     if(w.lastWorship!==undefined&&!finite(w.lastWorship,0,s.time))fail();
     workerIds.add(w.id);
     for(const key of ['wood','food','harvest'])if(!finite(w.cargo[key],0,1000))fail();
     if((w.cargo.harvest as number)>(w.cargo.food as number))fail();
     if(w.job!==null){
-      const j=w.job;if(!record(j)||![...FOOD_JOBS,'wood','forage','build','plant','harvest','deliver','clear','rally','worship','butcher','supply'].includes(j.kind as string)||!integer(j.target)||!finite(j.work,0,1e6)||!Array.isArray(j.route)||j.route.length>40000||!j.route.every(point))fail();
+      const j=w.job;if(!record(j)||![...FOOD_JOBS,'wood','forage','build','plant','harvest','deliver','clear','rally','worship','butcher','supply','gather'].includes(j.kind as string)||!integer(j.target)||!finite(j.work,0,1e6)||!Array.isArray(j.route)||j.route.length>40000||!j.route.every(point))fail();
     }
   }
   if(s.beacon!==null){
@@ -103,7 +104,7 @@ export function decodeSave(raw:string):IslandSave{
     }
   }
   for(const p of plots){
-    if(!record(p)||!['home','farm','temple','slaughterhouse','coop','pigpen','granary','storehouse'].includes(p.kind as string)||!['building','complete'].includes(p.stage as string)||!finite(p.progress,0,1)||!finite(p.moisture,0,1)||!finite(p.fertility,0,1)||!finite(p.crop,0,1)||!integer(p.harvests)||typeof p.valid!=='boolean'||typeof p.planted!=='boolean'||!(p.claimedBy===null||workerIds.has(p.claimedBy as number)))return fail();
+    if(!record(p)||!['home','farm','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(p.kind as string)||!['building','complete'].includes(p.stage as string)||!finite(p.progress,0,1)||!finite(p.moisture,0,1)||!finite(p.fertility,0,1)||!finite(p.crop,0,1)||!integer(p.harvests)||typeof p.valid!=='boolean'||typeof p.planted!=='boolean'||!(p.claimedBy===null||workerIds.has(p.claimedBy as number)))return fail();
     if(p.kind==='temple'&&!integer(p.offerings,0,50))fail();
     if(p.kind==='slaughterhouse'&&(!integer(p.livestock,p.stage==='complete'?2:0,4)||typeof p.rearing!=='boolean'||!finite(p.rearingProgress,0,1)||!integer(p.processed)))fail();
     if(p.farmerId!==undefined&&p.farmerId!==null&&(p.kind!=='farm'||!workerIds.has(p.farmerId as number)))fail();
@@ -139,6 +140,7 @@ export function decodeSave(raw:string):IslandSave{
     if(job.kind==='rally'){
       const b=s.beacon;if(!record(b)||job.target!==b.id||!(b.members as Record<string,unknown>[]).some(m=>m.id===worker.id&&['walking','arrived'].includes(m.phase as string)))fail();continue;
     }
+    if(job.kind==='gather'){if(!plots.some(v=>{const p=v as Record<string,unknown>;return p.id===job.target&&p.kind==='bonfire'&&p.stage==='complete'&&p.valid;}))fail();continue;}
     if(job.kind==='clear'){if(!orders.some(o=>(o as Record<string,unknown>).id===job.target))fail();continue;}
     const list=job.kind==='wood'||job.kind==='forage'?resources:plots;
     const target=list.find(v=>(v as Record<string,unknown>).id===job.target) as Record<string,unknown>|undefined;
