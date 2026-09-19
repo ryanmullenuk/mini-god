@@ -87,7 +87,6 @@ export default function Home() {
     <div ref={host} className="world" aria-label="Living 3D island. Drag to sculpt, or choose a guidance power and click a building site." />
     <div className="vignette" />
     <header className="topbar">
-      <div className="brand"><h1 className="wordmark">MINI GOD</h1><div className="brand-sub">A little world in your hands</div></div>
       <div className="top-actions">
         <button className="round-button glass" aria-label={sound?'Mute sea and bird sounds':'Enable sea and bird sounds'} title={sound?'Sound on':'Sound off'} aria-pressed={sound} onClick={toggleSound}>{sound?<Volume2/>:<VolumeX/>}</button>
 

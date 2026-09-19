@@ -127,3 +127,6 @@
 @media(max-height:550px){.village-panel.village-compact{top:70px;max-height:calc(100dvh - 190px)}.compact-controls .bottom-guidance{display:flex;font-size:10px;min-height:22px}}
 /* Keep compact controls readable: shorten labels instead of shrinking type. */
 .icon-powers span,.food-tabs span,.food-tabs b,.compact-food small{font-size:12px}.village-compact .icon-powers button{min-width:0}.compact-food p,.compact-food label,.compact-food .food-focus,.food-actions button{font-size:14px}.village-compact .village-objective,.village-compact .village-milestone,.village-compact .faith-status,.village-compact .prayer-card p{font-size:14px}.village-compact .village-toggles button{font-size:12px}.building-entry>summary{font-size:14px}.food-tabs{grid-template-columns:repeat(2,1fr)}.food-tabs button{grid-template-columns:24px 1fr auto;align-items:center;min-height:42px;padding:6px}.food-tabs span{justify-self:start}.food-tabs b{justify-self:end}
+
+/* Gameplay branding is intentionally hidden after the splash screen. */
+.topbar{justify-content:flex-end}

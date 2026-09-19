@@ -73,15 +73,25 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       colour+=sunColour*glint*lightPower*(.85+.15*broad)*(.92+.08*swell);
       // The wave wash is tied to actual submerged height, including sculpted bays.
       float shore=texture2D(shoreMap,clamp(uv,0.,1.)).r;
-      float phase=time*.85+noise(p*.09)*4.;
-      float breath=.38+.20*sin(phase);
-      // One slow advancing wash, broken up along the shore; no ocean-wide rings.
-      float wash=.25+1.35*(.5+.5*sin(phase));
-      float breaker=(1.-smoothstep(.10,.38,abs(shore-wash)))
-        *(1.-smoothstep(1.3,2.,shore))*(.55+.25*broad);
-      float foam=((1.-smoothstep(.10,.40,depth))*breath+breaker)*inside;
-      // A fading wake makes the advancing crest read as gentle breaking surf.
-      foam+=inside*(1.-smoothstep(.05,.75,abs(shore-wash+.32)))*(.10+.12*broad);
+      float coastVariation=noise(p*.055)*.18;
+      float waveCycle=fract(time*.105+coastVariation);
+      float secondCycle=fract(waveCycle+.52);
+      // Breakers form offshore, travel towards land, then spread into a bright
+      // crash at the beach. Both waves reuse the static shoreline distance map.
+      float waveDistance=mix(12.5,.35,waveCycle);
+      float secondDistance=mix(10.5,.35,secondCycle);
+      float waveWidth=mix(.34,1.05,smoothstep(.55,1.,waveCycle));
+      float secondWidth=mix(.30,.90,smoothstep(.55,1.,secondCycle));
+      float firstCrest=1.-smoothstep(waveWidth,waveWidth+.42,abs(shore-waveDistance));
+      float secondCrest=1.-smoothstep(secondWidth,secondWidth+.38,abs(shore-secondDistance));
+      float firstCrash=mix(.18,.78,smoothstep(.42,.96,waveCycle));
+      float secondCrash=mix(.12,.58,smoothstep(.46,.96,secondCycle));
+      float breaker=(firstCrest*firstCrash+secondCrest*secondCrash)
+        *(1.-smoothstep(13.,15.5,shore))*(.68+.32*broad);
+      float shoreSurge=(1.-smoothstep(.05,1.15,shore))
+        *(.24+.22*smoothstep(.72,1.,waveCycle));
+      float breath=.46+.14*sin(time*.34+noise(p*.09)*4.);
+      float foam=((1.-smoothstep(.10,.40,depth))*breath+breaker+shoreSurge)*inside;
       for(int i=0;i<32;i++){
         if(i>=contactCount)break;
         float edge=abs(length(p-contacts[i].xy)-contacts[i].z);
