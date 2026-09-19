@@ -6,6 +6,8 @@ import type { GuidancePreview } from './world-state';
 /** A reusable preview; it never changes terrain, inventory or construction. */
 export class GuidanceCursor {
   group=new THREE.Group();
+  private torch=new THREE.Group();
+  private bonfire=new THREE.Group();
   private home=new THREE.Group();
   private farm=new THREE.Group();
   private beacon=new THREE.Group();
@@ -16,11 +18,14 @@ export class GuidanceCursor {
   private edge=new THREE.MeshBasicMaterial({color:'#b8e3ab',depthTest:false,depthWrite:false});
   private fill=new THREE.MeshBasicMaterial({color:'#b8e3ab',transparent:true,opacity:.24,depthTest:false,depthWrite:false});
   constructor(private terrain:Terrain){
-    this.group.add(this.home,this.farm,this.beacon,this.temple,this.slaughterhouse,this.boundary,this.blessing);this.group.visible=false;
+    this.group.add(this.torch,this.bonfire,this.home,this.farm,this.beacon,this.temple,this.slaughterhouse,this.boundary,this.blessing);this.group.visible=false;
     const box=(root:THREE.Object3D,size:number[],position:number[],material:THREE.Material)=>{
       const m=new THREE.Mesh(new THREE.BoxGeometry(size[0],size[1],size[2]),material);
       m.position.set(position[0],position[1],position[2]);m.renderOrder=10;root.add(m);
     };
+    box(this.torch,[.09,1.1,.09],[0,.55,0],this.fill);
+    box(this.torch,[.25,.2,.25],[0,1.1,0],this.fill);
+    const pit=new THREE.Mesh(new THREE.TorusGeometry(.6,.12,4,10),this.fill);pit.rotation.x=Math.PI/2;pit.position.y=.14;this.bonfire.add(pit);
     const light=new THREE.Mesh(new THREE.OctahedronGeometry(.28),this.fill);light.position.y=2.2;this.beacon.add(light);
     box(this.beacon,[.06,2,.06],[0,1,0],this.edge);
     for(const z of [-1.05,1.05])box(this.boundary,[2.1,.035,.055],[0,.02,z],this.edge);
@@ -39,6 +44,7 @@ export class GuidanceCursor {
   }
   show(preview:GuidancePreview|null){
     this.group.visible=!!preview;if(!preview)return;
+    this.torch.visible=preview.kind==='torch';this.bonfire.visible=preview.kind==='bonfire';
     this.home.scale.setScalar(preview.kind==='home'?B.visuals.hut:1);
     this.home.visible=preview.kind==='granary'||preview.kind==='storehouse'||preview.kind==='home'||preview.kind==='coop'||preview.kind==='pigpen';this.farm.visible=preview.kind==='farm';this.beacon.visible=(preview.kind==='rally'||preview.kind==='settle'||preview.kind==='fishing'||preview.kind==='trap');this.temple.visible=preview.kind==='temple';this.slaughterhouse.visible=preview.kind==='slaughterhouse';
     this.blessing.visible=preview.kind==='rain'||preview.kind==='bloom';this.blessing.scale.setScalar(preview.radius??1);this.boundary.visible=!this.blessing.visible;
