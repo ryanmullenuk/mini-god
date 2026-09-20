@@ -1,6 +1,6 @@
 # Mini God
 
-A stylized miniature god game: sculpt a terraced archipelago, guide a village, and watch its people, wildlife and coastal world develop.
+A stylized miniature god game: sculpt a tropical island, guide a village, and watch its people, wildlife and coastal world develop.
 
 [Play the current game](https://tide-island-sculpt.niall-harper-3240.chatgpt.site)
 

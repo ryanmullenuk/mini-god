@@ -59,14 +59,14 @@ test('slaughterhouses rear goats from surplus feed, protect the breeding pair an
     sim.state.food=0;house.rearing=false;house.rearingProgress=0;run(sim,.1);assert.equal(house.rearing,false,'No breeding feed is conjured when storage is empty');
   }finally{terrain.dispose();}
 });
-test('targeted rain and growth affect only their area and reject outside influence without a charge',()=>{
+test('rain reaches the whole island while growth stays local and powers reject outside influence',()=>{
   const {terrain,sim}=flat();try{
     sim.state.wood=12;assert.ok(sim.guide('farm',{x:1,z:3}).allowed);assert.ok(sim.guide('farm',{x:-14,z:3}).allowed);run(sim,100);
     const near=sim.state.plots.find(p=>p.kind==='farm'&&p.x===1),far=sim.state.plots.find(p=>p.kind==='farm'&&p.x===-14);assert.ok(near&&far);
     near.moisture=.1;far.moisture=.1;sim.state.faith=40;
-    const preview=sim.guidancePreview('rain',near);assert.equal(preview.radius,6);assert.ok(preview.allowed);assert.match(preview.message,/1 fields/);
-    assert.ok(sim.power('rain',near));assert.equal(sim.state.faith,32);assert.ok(near.moisture>.5);assert.equal(far.moisture,.1);
-    assert.equal(sim.wetAt(near),true);assert.equal(sim.wetAt(far),false);
+    const preview=sim.guidancePreview('rain',near);assert.equal(preview.radius,6);assert.ok(preview.allowed);assert.match(preview.message,/Island-wide rain/);
+    assert.ok(sim.power('rain',near));assert.equal(sim.state.faith,32);assert.ok(near.moisture>.5);assert.ok(far.moisture>.5);assert.equal(sim.state.rainArea,null);
+    assert.equal(sim.wetAt(near),true);assert.equal(sim.wetAt(far),true);
     const f=far.fertility;assert.ok(sim.power('bloom',near));assert.equal(far.fertility,f);
     const before=structuredClone(sim.state);assert.equal(sim.guide('rain',{x:45,z:45}).allowed,false);assert.deepEqual(sim.state,before);
     assert.equal(sim.guide('bloom',{x:NaN,z:3}).allowed,false);assert.deepEqual(sim.state,before);
@@ -82,7 +82,7 @@ test('two huts, a delivered harvest and temple unlock wider blessings permanentl
     temple.valid=false;run(sim,.1);assert.equal(sim.state.tier,2);
   }finally{terrain.dispose();}
 });
-test('active worship, livestock and targeted rain saves resume without duplicate food or faith',()=>{
+test('active worship, livestock and island-wide rain saves resume without duplicate food or faith',()=>{
   const {terrain,sim}=flat(),restoredTerrain=new Terrain();try{
     sim.state.wood=40;
     for(const [kind,p] of [['home',{x:1,z:7}],['farm',{x:-5,z:8}],['temple',{x:1,z:3}],['slaughterhouse',{x:-12,z:3}]])assert.ok(sim.guide(kind,p).allowed);
@@ -90,7 +90,7 @@ test('active worship, livestock and targeted rain saves resume without duplicate
     const saved=decodeSave(encodeSave(terrain.values,sim.state));restoredTerrain.values.set(saved.terrain);
     const other=new Settlement(restoredTerrain,saved.world);run(sim,300);run(other,300);assert.deepEqual(sim.state,other.state);
     const raw=encodeSave(terrain.values,sim.state);
-    for(const mutate of [s=>s.world.plots.find(p=>p.kind==='temple').offerings=100,s=>s.world.plots.find(p=>p.kind==='slaughterhouse').livestock=1,s=>s.world.plots.find(p=>p.kind==='slaughterhouse').rearingProgress=-1,s=>s.world.tier=3,s=>s.world.rainArea.radius=999]){const s=JSON.parse(raw);mutate(s);assert.throws(()=>decodeSave(JSON.stringify(s)));}
+    for(const mutate of [s=>s.world.plots.find(p=>p.kind==='temple').offerings=100,s=>s.world.plots.find(p=>p.kind==='slaughterhouse').livestock=1,s=>s.world.plots.find(p=>p.kind==='slaughterhouse').rearingProgress=-1,s=>s.world.tier=3,s=>s.world.rainArea={x:0,z:0,radius:999}]){const s=JSON.parse(raw);mutate(s);assert.throws(()=>decodeSave(JSON.stringify(s)));}
   }finally{terrain.dispose();restoredTerrain.dispose();}
 });
 test('version 4 villages retain guidance, cargo and buildings during the upgrade',()=>{

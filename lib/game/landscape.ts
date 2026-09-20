@@ -146,7 +146,7 @@ export class Landscape {
             put(this.crowns,x+dx*s,y+2.1*s,z+.13*s,1.15*s,.4*s,.85*s,'#729a36');
           }
         }else{
-          const tint=biome==='birch'?'#9bbb4c':biome==='autumn'?(r<.35?'#a3b84d':'#7d9d39'):biome==='blossom'?(r<.35?'#95b645':'#659438'):['#4e852b','#6c9e32','#8eb33d'][Math.floor(random()*3)];
+          const tint=biome==='birch'?(r<.35?'#b8cf55':'#8fbd3e'):biome==='autumn'?(r<.35?'#efa638':'#c86f28'):biome==='blossom'?(r<.35?'#e67aaf':'#c84f93'):['#4e852b','#6c9e32','#8eb33d'][Math.floor(random()*3)];
           // Narrow cypress silhouettes punctuate the meadow groves.
           if(!biome&&r<.09){put(this.crowns,x,y+2.25*s,z,.42*s,1.5*s,.42*s,'#658e42');}
           else{

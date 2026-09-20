@@ -6,7 +6,6 @@ import type { Settlement } from './settlement';
 import type { Plot, Resource } from './world-state';
 
 type PlotVisual={root:THREE.Group;building:THREE.Group;crops:THREE.Group;outline:THREE.Group;supplies:THREE.Group;animals:THREE.Group;offering:THREE.Mesh;previousOfferings:number;collectedUntil:number};
-const UP=new THREE.Vector3(0,1,0);
 export class SettlementView {
   group=new THREE.Group();
   private plots=new Map<number,PlotVisual>();
@@ -19,7 +18,6 @@ export class SettlementView {
   private beacon=new THREE.Group();
   private beaconGlow:THREE.Mesh;
   private prayer:THREE.Mesh;
-  private rain:THREE.LineSegments;
   private dummy=new THREE.Object3D();
   private materialCache=new Map<string,THREE.MeshLambertMaterial>();
   private opportunityKey='';
@@ -42,8 +40,6 @@ export class SettlementView {
     const glow=new THREE.MeshBasicMaterial({color:'#fff3a6',transparent:true,opacity:.85});
     this.prayer=new THREE.Mesh(new THREE.OctahedronGeometry(.17),glow);this.group.add(this.prayer);
 
-    const rainGeometry=new THREE.BufferGeometry();rainGeometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(240*6),3));
-    this.rain=new THREE.LineSegments(rainGeometry,new THREE.LineBasicMaterial({color:'#c9edf4',transparent:true,opacity:.48,depthWrite:false}));this.rain.frustumCulled=false;this.group.add(this.rain);
   }
   private material(color:string){let m=this.materialCache.get(color);if(!m){m=new THREE.MeshLambertMaterial({color,flatShading:true});this.materialCache.set(color,m);}return m;}
   private mesh(root:THREE.Object3D,geometry:THREE.BufferGeometry,color:string,x=0,y=0,z=0){
@@ -74,16 +70,16 @@ export class SettlementView {
       const halo=new THREE.Mesh(new THREE.CircleGeometry(torch?.65:1.35,24),new THREE.MeshBasicMaterial({color:'#ffb951',transparent:true,opacity:.12,depthWrite:false,toneMapped:false}));
       halo.name='fire-halo';halo.rotation.x=-Math.PI/2;halo.position.y=.035;building.add(halo);
     }else if(p.kind==='home'){building.scale.setScalar(B.visuals.hut);
-      this.box(building,1.85,.11,1.85,'#9e825c',0,.04,0);
-      this.box(building,1.6,1.15,1.5,'#d8c28c',0,.65,-.08);
-      this.box(building,.48,.85,.04,'#4d5844',0,.47,.685);
-      for(const x of [-.88,.88])for(const z of [-.88,.88])this.mesh(building,new THREE.CylinderGeometry(.055,.07,1.5,6),'#82613b',x,.78,z);
-      const roof=this.mesh(building,new THREE.ConeGeometry(1.7,.95,4),'#a8874b',0,1.76,0);roof.rotation.y=Math.PI/4;
-      this.box(building,.05,.37,.1,'#6c876a',.88,1.13,.9);
+      this.box(building,1.85,.11,1.85,'#d7c8a5',0,.04,0);
+      this.box(building,1.62,1.18,1.52,'#f1ead7',0,.67,-.08);
+      this.box(building,.46,.82,.05,'#438ca4',0,.46,.69);
+      for(const x of [-.72,.72])for(const z of [-.65,.65])this.box(building,.12,1.0,.12,'#e4dcc8',x,.58,z);
+      const roof=this.mesh(building,new THREE.ConeGeometry(1.72,.72,4),'#c87545',0,1.63,0);roof.rotation.y=Math.PI/4;
+      this.box(building,.20,.48,.22,'#eee6d3',.52,1.65,-.33);
       const cottage=new THREE.Group();cottage.name='cottage';building.add(cottage);
-      this.box(cottage,.26,1,.3,'#c8bba0',.55,1.95,-.45);
-      for(const x of [-.48,.48])this.box(cottage,.25,.3,.045,'#80b1a3',x,.85,.70);
-      this.box(cottage,1.3,.1,.42,'#a58b60',0,.12,.93);
+      this.box(cottage,.38,.72,.42,'#f1ead7',.48,1.64,-.38);
+      for(const x of [-.48,.48])this.box(cottage,.25,.3,.045,'#69a5b2',x,.85,.70);
+      this.box(cottage,1.3,.1,.42,'#c87545',0,.12,.93);
     }else if(p.kind==='granary'||p.kind==='storehouse'){
       const food=p.kind==='granary';
       this.box(building,1.85,.16,1.85,'#9e825c',0,.08,0);
@@ -148,8 +144,28 @@ export class SettlementView {
   private makeNode(n:Resource){
     const root=new THREE.Group(),crown=new THREE.Group();root.add(crown);
     if(n.kind==='wood'){
-      this.mesh(root,new THREE.CylinderGeometry(.08,.16,1.2,7),'#8b714d',0,.6,0);
-      for(let i=0;i<3;i++)this.mesh(crown,new THREE.ConeGeometry(.78-i*.17,1.1,7),i%2?'#6b934e':'#779e52',0,1.15+i*.48,0);
+      const variant=n.id%5;
+      if(variant===0){
+        this.mesh(root,new THREE.CylinderGeometry(.10,.19,1.35,7),'#795b3d',0,.67,0);
+        for(const [x,y,z,s] of [[0,1.55,0,.72],[-.47,1.35,.05,.50],[.45,1.38,.02,.54],[0,1.48,-.42,.48]] as const){
+          const leaf=this.mesh(crown,new THREE.IcosahedronGeometry(s,1),y>1.5?'#75a83e':'#5f9138',x,y,z);leaf.scale.y=.82;
+        }
+      }else if(variant===1){
+        this.mesh(root,new THREE.CylinderGeometry(.08,.15,1.45,7),'#71563c',0,.72,0);
+        for(let i=0;i<4;i++)this.mesh(crown,new THREE.ConeGeometry(.78-i*.13,.85,7),i%2?'#245e43':'#2f704b',0,1.15+i*.42,0);
+      }else if(variant===2){
+        const trunk=this.mesh(root,new THREE.CylinderGeometry(.07,.14,1.75,7),'#947047',0,.86,0);trunk.rotation.z=.08;
+        for(let i=0;i<7;i++){
+          const a=i*Math.PI*2/7,leaf=this.mesh(crown,new THREE.IcosahedronGeometry(.48,0),i%2?'#6ca638':'#82b746',Math.sin(a)*.48,1.75+Math.cos(a)*.08,Math.cos(a)*.48);
+          leaf.scale.set(.38,.20,1.45);leaf.rotation.y=a;
+        }
+      }else{
+        this.mesh(root,new THREE.CylinderGeometry(.09,.17,1.25,7),'#76543d',0,.62,0);
+        const colors=variant===3?['#d75e9c','#ea82b5','#c94788']:['#d98726','#efa638','#bf6724'];
+        for(const [i,p] of [[0,[0,1.53,0]],[1,[-.42,1.32,.02]],[2,[.42,1.34,.04]],[3,[0,1.35,-.40]]] as const){
+          const leaf=this.mesh(crown,new THREE.IcosahedronGeometry(i===0?.62:.46,1),colors[i%3],p[0],p[1],p[2]);leaf.scale.y=.9;
+        }
+      }
     }else{
       this.mesh(crown,new THREE.IcosahedronGeometry(.48,1),'#729054',0,.38,0);
       for(let i=0;i<7;i++){const a=i*2.4;this.mesh(crown,new THREE.IcosahedronGeometry(.08,0),'#d2a766',Math.sin(a)*.38,.52+Math.cos(i)*.1,Math.cos(a)*.35);}
@@ -248,17 +264,6 @@ export class SettlementView {
     this.opportunities.visible=showPlots;
     this.prayer.visible=!!s.prayer&&!!s.camp;
     if(s.camp){this.prayer.position.set(s.camp.x,this.terrain.height(s.camp.x,s.camp.z)+3+Math.sin(s.time*2)*.15,s.camp.z);this.prayer.rotation.y=s.time;}
-    this.rain.visible=sim.raining&&!!s.camp;
-    if(this.rain.visible&&s.camp){
-      const natural=s.time%360>=310&&s.time%360<335;
-      const region=!natural&&s.rainArea?s.rainArea:{...s.camp,radius:13};
-      const positions=this.rain.geometry.getAttribute('position');
-      for(let i=0;i<240;i++){
-        const a=i*27.17,r=Math.sqrt((i*.618)%1)*region.radius,x=region.x+Math.cos(a)*r,z=region.z+Math.sin(a)*r;
-        const y=this.terrain.height(x,z)+1+((i*.371-s.time*5)%9+9)%9;
-        positions.setXYZ(i*2,x,y,z);positions.setXYZ(i*2+1,x-.035,y+.45,z);}
-      positions.needsUpdate=true;
-    }
   }
   private clearGeometry(root:THREE.Object3D){root.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const materials=Array.isArray(o.material)?o.material:[o.material];for(const material of materials)if(![...this.materialCache.values()].includes(material))material.dispose();}});root.clear();}
   dispose(){

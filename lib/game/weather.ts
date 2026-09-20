@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { EXTENT } from './terrain';
 
-/** One GPU-animated draw call for full-archipelago rain. */
+/** One GPU-animated draw call for fine, island-wide rain. */
 export class IslandWeather {
   readonly group=new THREE.Group();
   private intensity=0;
   private time=0;
   private geometry:THREE.BufferGeometry;
   private material:THREE.ShaderMaterial;
-  constructor(count=720){
+  constructor(count=480){
     const positions=new Float32Array(count*2*3),phases=new Float32Array(count*2);
     let seed=92821;
     const random=()=>{seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;};
@@ -22,7 +22,7 @@ export class IslandWeather {
     this.material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{time:{value:0},intensity:{value:0}},
       vertexShader:`attribute float phase;uniform float time;varying float fade;
         void main(){vec3 p=position;p.y=22.-mod(phase*37.+time*24.-position.y,37.);fade=smoothstep(-14.,-7.,p.y)*(1.-smoothstep(17.,22.,p.y));gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`,
-      fragmentShader:`uniform float intensity;varying float fade;void main(){gl_FragColor=vec4(.72,.87,.94,intensity*fade*.52);}`});
+      fragmentShader:`uniform float intensity;varying float fade;void main(){gl_FragColor=vec4(.72,.87,.94,intensity*fade*.30);}`});
     const rain=new THREE.LineSegments(this.geometry,this.material);rain.name='Island rain';rain.frustumCulled=false;rain.renderOrder=4;this.group.add(rain);this.group.visible=false;
   }
   update(dt:number,raining:boolean,paused=false){

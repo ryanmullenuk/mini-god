@@ -449,28 +449,29 @@ export class Settlement {
     return [...(s.camp?[{...s.camp,radius:18+bonus}]:[]),...s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').map(p=>({x:p.x,z:p.z,radius:18+bonus+(s.tier===2?6:0)}))];
   }
   private naturalRain(){
-    const cycle=Math.floor(this.state.time/240),within=this.state.time-cycle*240;
+    const cycle=Math.floor(this.state.time/480),within=this.state.time-cycle*480;
     const random=(((Math.imul(cycle+17,1103515245)+12345)>>>0)/4294967296);
-    const start=125+random*70,duration=22+random*18;
+    const start=240+random*180,duration=16+random*12;
     return within>=start&&within<start+duration;
   }
-  wetAt(p:Point){const s=this.state;return this.naturalRain()||s.rain>0&&(!s.rainArea||distance(p,s.rainArea)<=s.rainArea.radius);}
+  wetAt(_p:Point){return this.raining;}
   private powerPreview(kind:'rain'|'bloom',p:Point):GuidancePreview{
     const radius=this.state.tier===2?8:6;
     const result=(allowed:boolean,message:string):GuidancePreview=>({...p,kind,radius,wood:0,allowed,message});
     if(!Number.isFinite(p.x)||!Number.isFinite(p.z)||this.metadata.inspect(p.x,p.z)?.submerged!==false)return result(false,'Choose dry land for this blessing.');
     if(!this.influenceAreas().some(a=>distance(a,p)+radius<=a.radius))return result(false,'Place the whole blessing inside your influence. Temples extend your reach.');
     if(this.state.faith<POWER_COST[kind])return result(false,`You need ${POWER_COST[kind]} faith for this blessing.`);
+    if(kind==='rain')return result(true,`Island-wide rain · ${POWER_COST.rain} faith`);
     const fields=this.state.plots.filter(f=>f.kind==='farm'&&f.valid&&distance(p,f)<=radius).length;
-    return result(true,`${kind==='rain'?'Rain':'New growth'} · ${fields} fields · ${POWER_COST[kind]} faith`);
+    return result(true,`New growth · ${fields} fields · ${POWER_COST[kind]} faith`);
   }
   power(kind:'rain'|'bloom',point:Point|null=this.state.camp){
     if(!point||!this.powerPreview(kind,point).allowed)return false;
     const s=this.state,radius=s.tier===2?8:6;s.faith-=POWER_COST[kind];
     if(kind==='rain'){
-      s.rain=18;s.rainArea={x:point.x,z:point.z,radius};
-      for(const p of s.plots)if(p.kind==='farm'&&p.valid&&distance(p,point)<=radius)p.moisture=Math.min(1,p.moisture+.45);
-      this.event('Rain falls over the ground you blessed.');
+      s.rain=18;s.rainArea=null;
+      for(const p of s.plots)if(p.kind==='farm'&&p.valid)p.moisture=Math.min(1,p.moisture+.45);
+      this.event('Rain falls across the island.');
     }else{
       s.blessing=12;
       for(const p of s.plots)if(p.kind==='farm'&&p.valid&&distance(p,point)<=radius){p.fertility=Math.min(1,p.fertility+.1);if(p.planted)p.crop=Math.min(1,p.crop+.15);}
@@ -501,7 +502,7 @@ export class Settlement {
     if(this.capacity>=s.settlers.length&&s.food>s.settlers.length*3)s.faith=Math.min(500,s.faith+dt*s.settlers.length*.008);
 
     for(const n of s.resources)if(n.valid&&n.stock<n.capacity){
-      n.regrowth+=dt*(this.naturalRaining&&n.kind==='wood'?2.5:this.wetAt(n)?1.5:1);
+      n.regrowth+=dt*(this.raining&&n.kind==='wood'?2.5:this.raining?1.5:1);
       if(n.regrowth>=45){n.regrowth-=45;n.stock=Math.min(n.capacity,n.stock+1);}
     }
     for(const p of s.plots)if(p.kind==='farm'&&p.valid){
