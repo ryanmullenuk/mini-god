@@ -111,7 +111,7 @@
 @media(max-width:600px){.wordmark{font-size:25px}}
 
 /* Compact icon-led village dock; information opens only when requested. */
-.village-panel.village-compact{top:145px;left:18px;width:250px;border-radius:16px;max-height:calc(100dvh - 275px);overflow:auto}
+.village-panel.village-compact{top:18px;left:18px;width:250px;border-radius:16px;max-height:calc(100dvh - 148px);overflow:auto}
 .village-tabs{display:flex;align-items:center;gap:5px;padding:7px}
 .village-tabs button{display:flex;align-items:center;justify-content:center;gap:7px;flex:1;min-height:42px;background:none;color:#315b4e;border:0;border-radius:10px}
 .village-tabs svg{width:21px;height:21px}.village-tabs b{font-size:12px}.village-tabs button.selected{background:#315e4e;color:#fff}.village-tabs .close-village{flex:0 0 30px}
@@ -124,8 +124,8 @@
 .village-compact .building-details{margin-top:10px}.village-compact .building-details>summary{font-size:12px}.village-compact .building-details li{padding:4px 0}.village-compact .worker-list li{font-size:12px}.village-compact .guidance-queue h3{font-size:12px}
 .compact-food{border:0;margin:0;padding:0}.food-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.food-tabs button{padding:6px 2px;display:grid;gap:4px;justify-items:center;min-height:62px}.food-tabs svg{width:21px;height:21px}.food-tabs span{font-size:9px}.food-tabs b{font-size:11px}.food-tabs button[aria-pressed=true]{background:#315e4e;color:#fff}.compact-food .food-actions{margin:9px 0}.food-actions button{width:100%;font-size:12px}.compact-food h3{font-size:12px;margin:10px 0}.compact-food p,.compact-food label{font-size:11px}.compact-food .food-item{padding:8px 0}.compact-food small{font-size:10px;line-height:1.4}.compact-food .food-focus{font-size:12px;padding:7px}
 .tool-area.compact-controls{width:calc(100% - 32px);max-width:none}.compact-controls .bottom-guidance{width:100%;max-width:min(880px,95vw);min-height:30px;font-size:12px;line-height:1.4;padding:5px 10px;background:#163d4bc4;border-radius:10px;pointer-events:none;color:#f4f6e4;text-shadow:none}.bottom-left,.bottom-right{display:none}
-@media(max-width:600px){.village-panel.village-compact{top:111px;left:12px;width:222px;max-height:calc(100dvh - 245px)}.village-tabs button{min-height:38px}.compact-controls .bottom-guidance{font-size:11px;max-width:96vw}.village-compact .icon-powers button{min-height:49px}}
-@media(max-height:550px){.village-panel.village-compact{top:70px;max-height:calc(100dvh - 190px)}.compact-controls .bottom-guidance{display:flex;font-size:10px;min-height:22px}}
+@media(max-width:600px){.village-panel.village-compact{top:max(12px,env(safe-area-inset-top));left:12px;width:222px;max-height:calc(100dvh - 145px)}.village-tabs button{min-height:38px}.compact-controls .bottom-guidance{font-size:11px;max-width:96vw}.village-compact .icon-powers button{min-height:49px}}
+@media(max-height:550px){.village-panel.village-compact{top:10px;max-height:calc(100dvh - 125px)}.compact-controls .bottom-guidance{display:flex;font-size:10px;min-height:22px}}
 /* Keep compact controls readable: shorten labels instead of shrinking type. */
 .icon-powers span,.food-tabs span,.food-tabs b,.compact-food small{font-size:12px}.village-compact .icon-powers button{min-width:0}.compact-food p,.compact-food label,.compact-food .food-focus,.food-actions button{font-size:14px}.village-compact .village-objective,.village-compact .village-milestone,.village-compact .faith-status,.village-compact .prayer-card p{font-size:14px}.village-compact .village-toggles button{font-size:12px}.building-entry>summary{font-size:14px}.food-tabs{grid-template-columns:repeat(2,1fr)}.food-tabs button{grid-template-columns:24px 1fr auto;align-items:center;min-height:42px;padding:6px}.food-tabs span{justify-self:start}.food-tabs b{justify-self:end}
 

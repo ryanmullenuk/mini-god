@@ -94,7 +94,7 @@ export default function Home() {
         <button className="round-button glass" aria-label="How to play and island saves" onClick={() => setHelp(true)}><HelpCircle /></button>
       </div>
     </header>
-    <div className="island-label"><span className="live-dot" />{paused ? 'Paused' : `${village?.timeOfDay ?? 'Dawn'}${village?.raining ? ' · Rain' : ''}`}</div>
+    {(paused||village?.raining)&&<div className="island-label"><span className="live-dot" />{paused?'Paused':'Rain'}</div>}
 
     {!!population && village && <section className={`village-panel village-compact glass${panel ? ' panel-open' : ''}`} aria-label="Village controls">
       <nav className="village-tabs" aria-label="Village panels">{([{id:'village',label:'Your village',Icon:Users,count:population},{id:'build',label:'Buildings and god powers',Icon:Hammer,count:village.buildings.length},{id:'food',label:'Food and wildlife',Icon:Fish,count:null}] as const).map(({id,label,Icon,count})=><button key={id} aria-label={label} title={label} aria-expanded={panel===id} aria-controls="village-detail-panel" className={panel===id?'selected':''} onClick={()=>{setPanel(panel===id?null:id);setShapeOpen(false);setNotice(id==='village'?village.objective:id==='build'?'Choose a building icon, then choose its site on the island.':'Choose a food icon to manage fish, chickens, pigs or hunting.');}}><Icon/>{count!==null&&<b>{count}</b>}</button>)}{panel&&<button className="close-village" aria-label="Close village panel" onClick={()=>setPanel(null)}><X/></button>}</nav>
@@ -102,7 +102,7 @@ export default function Home() {
         <div title="Stored food, after deliveries and meals"><Wheat /><b>{village.food}</b><span>Food</span></div>
         <div title="Wood delivered to camp"><TreePine /><b>{village.wood}</b><span>Wood</span></div>
         <div title="Faith from answered prayers and cared-for settlers"><Sparkles /><b>{village.faith}</b><span>Faith</span></div>
-        <div title="Settlers with completed, usable shelter"><House /><b>{village.sheltered}/{population}</b><span>Sheltered</span></div>
+        <div title="Island population"><Users /><b>{population}</b><span>Population</span></div>
       </div>
       {panel && <div className="village-body" id="village-detail-panel">
         <h2 className="panel-caption">{panel==='village'?'Your village':panel==='build'?'Build & upgrade':'Food & wildlife'}</h2>

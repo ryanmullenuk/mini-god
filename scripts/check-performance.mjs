@@ -39,13 +39,13 @@ test('cached grid edges reduce terrain sampling for different starting points',(
  assert.ok(nav.routes.size<=256,'The route cache must remain bounded');
 });
 
-test('30 islanders share bounded resources, retain joints and dispose once',()=>{
+test('100 islanders share bounded resources, retain joints and dispose once',()=>{
  const terrain={level:()=>8,height:()=>2},people=new Islanders(terrain);
  people.add(10);
  const resources=()=>{const geometries=new Set(),materials=new Set();let visible=0;people.group.traverse(o=>{if(o.isMesh){geometries.add(o.geometry);materials.add(o.material);}});people.group.traverseVisible(o=>{if(o.isMesh)visible++;});return {geometries,materials,visible};};
- const small=resources();people.add(20);const large=resources();
+ const small=resources();people.add(90);const large=resources();
  assert.equal(large.geometries.size,small.geometries.size);assert.equal(large.materials.size,small.materials.size);
- assert.ok(large.visible<=450);assert.equal(people.people.length,30);
+ assert.ok(large.visible<=1500);assert.equal(people.people.length,100);
  const rig=people.people[0];assert.ok(rig.skirt.parent);assert.equal(rig.hammer.parent,rig.arms[1].elbow);assert.equal(rig.carried.children.length,2);
  const disposals=new Map();for(const asset of [...large.geometries,...large.materials])asset.addEventListener('dispose',()=>disposals.set(asset,(disposals.get(asset)??0)+1));
  people.clear();for(const asset of [...large.geometries,...large.materials])assert.equal(disposals.get(asset),1);

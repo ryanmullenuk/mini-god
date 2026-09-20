@@ -186,7 +186,7 @@ export class Islanders{
   }
  }
  add(count=2){
-  const added=Math.min(count,30-this.people.length);
+  const added=Math.min(count,100-this.people.length);
   for(let k=0;k<added;k++){
    const i=this.people.length,rig=makePerson(i%2===1,i,this.assets);
    const p:Person={...rig,x:(i%4-1.5)*5-8,z:(Math.floor(i/4)%3-1)*5+1,angle:i*2.4,goal:null,idle:i*.19,phase:i*.47,kneel:0,speed:0,targetSpeed:.48+(i%3)*.035,previous:0};

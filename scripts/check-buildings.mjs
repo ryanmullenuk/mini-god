@@ -33,6 +33,14 @@ test('cottage upgrade keeps shelter and requires physical deliveries before hamm
 test('upgrades reject missing wood and unsafe camp access without charging',()=>{
  const {terrain,sim}=setup();try{const p=plot(sim,'home');assert.equal(sim.upgradeHome(p.id),false);sim.state.wood=12;const route=sim.nav.route;sim.nav.route=()=>null;assert.equal(sim.upgradeHome(p.id),false);assert.equal(sim.state.wood,12);assert.equal(p.upgrading,undefined);sim.nav.route=route;}finally{terrain.dispose();}
 });
+test('islanders route around building and farm footprints without UI pathfinding',()=>{
+ const {terrain,sim}=setup();try{
+  plot(sim,'farm',0,0);plot(sim,'home',6,0);
+  const from={x:-4,z:0},to={x:4,z:0},route=sim.nav.route(from,to);assert.ok(route&&route.length>1);
+  let previous=from;for(const next of route){assert.ok(sim.nav.segment(previous,next));previous=next;}
+  sim.nav.route=()=>{throw new Error('status must not run pathfinding');};assert.doesNotThrow(()=>sim.status());
+ }finally{terrain.dispose();}
+});
 test('five residents fit each hut and village population caps at one hundred',()=>{
  const {terrain,sim}=setup();try{
   for(let i=0;i<20;i++)plot(sim,'home',i*3,3);assert.equal(sim.capacity,100);sim.add(200);assert.equal(sim.state.settlers.length,100);assert.equal(sim.add(1),100);
