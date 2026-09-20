@@ -80,7 +80,7 @@ export function decodeSave(raw:string):IslandSave{
     ids.add(entry.id);
   }
   for(const order of orders){
-    if(!record(order)||!['home','farm','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(order.kind as string)||!finite(order.x,-EXTENT/2+2,EXTENT/2-2)||!finite(order.z,-EXTENT/2+2,EXTENT/2-2)||!Number.isInteger(order.x*2)||!Number.isInteger(order.z*2))fail();
+    if(!record(order)||!['home','farm','dock','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(order.kind as string)||!finite(order.x,-EXTENT/2+2,EXTENT/2-2)||!finite(order.z,-EXTENT/2+2,EXTENT/2-2)||!Number.isInteger(order.x*2)||!Number.isInteger(order.z*2))fail();
   }
   for(const w of settlers){
     if(!record(w)||!integer(w.id,1)||typeof w.name!=='string'||w.name.length>40||!finite(w.heading)||typeof w.moving!=='boolean'||typeof w.stranded!=='boolean'||!record(w.cargo))return fail();
@@ -104,7 +104,8 @@ export function decodeSave(raw:string):IslandSave{
     }
   }
   for(const p of plots){
-    if(!record(p)||!['home','farm','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(p.kind as string)||!['building','complete'].includes(p.stage as string)||!finite(p.progress,0,1)||!finite(p.moisture,0,1)||!finite(p.fertility,0,1)||!finite(p.crop,0,1)||!integer(p.harvests)||typeof p.valid!=='boolean'||typeof p.planted!=='boolean'||!(p.claimedBy===null||workerIds.has(p.claimedBy as number)))return fail();
+    if(!record(p)||!['home','farm','dock','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(p.kind as string)||!['building','complete'].includes(p.stage as string)||!finite(p.progress,0,1)||!finite(p.moisture,0,1)||!finite(p.fertility,0,1)||!finite(p.crop,0,1)||!integer(p.harvests)||typeof p.valid!=='boolean'||typeof p.planted!=='boolean'||!(p.claimedBy===null||workerIds.has(p.claimedBy as number)))return fail();
+    if(p.kind==='dock'&&(!['none','building','at-sea','docked'].includes(p.boatState as string)||!finite(p.boatProgress,0,1)||!integer(p.boatTrips)))fail();
     if(p.kind==='temple'&&!integer(p.offerings,0,50))fail();
     if(p.kind==='slaughterhouse'&&(!integer(p.livestock,p.stage==='complete'?2:0,4)||typeof p.rearing!=='boolean'||!finite(p.rearingProgress,0,1)||!integer(p.processed)))fail();
     if(p.farmerId!==undefined&&p.farmerId!==null&&(p.kind!=='farm'||!workerIds.has(p.farmerId as number)))fail();

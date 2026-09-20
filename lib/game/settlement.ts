@@ -16,7 +16,7 @@ const PRAYERS:Record<PrayerKind,{title:string;message:string;reward:number}>={
   ground:{title:'Help us find our footing',message:'Our land or route has changed. Shape a path beside the camp and buildings, with one-layer steps and room to stand between them.',reward:6},
 };
 export const plotBounds=(p:Point&{kind?:BuildKind})=>{const r=p.kind==='farm'?1.65:1;return {minX:p.x-r,maxX:p.x+r,minZ:p.z-r,maxZ:p.z+r};};
-export const workPoint=(p:Point&{kind?:BuildKind})=>({x:p.x,z:p.z+(p.kind==='farm'?2.25:1.65)});
+export const workPoint=(p:Point&{kind?:BuildKind})=>({x:p.x,z:p.z+(p.kind==='dock'?0:p.kind==='farm'?2.25:1.65)});
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.z-b.z);
 
 export class Settlement {
@@ -31,7 +31,7 @@ export class Settlement {
 
   constructor(readonly terrain:Terrain,state?:WorldState,createWaterWorker?:()=>Worker){
     this.state=state??newWorld();this.metadata=new TerrainMetadata(terrain,undefined,createWaterWorker);
-    this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='farm'&&p.valid&&Math.abs(x-p.x)<1.32&&Math.abs(z-p.z)<1.32));
+    this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='farm'&&p.kind!=='dock'&&p.valid&&Math.abs(x-p.x)<1.32&&Math.abs(z-p.z)<1.32));
     this.foodSystem=new FoodSystem(()=>this.state,terrain,this.nav,(w,k,id,p)=>this.assign(w,k,id,p),w=>this.release(w));
   }
   private event(message:string){this.state.lastEvent=message;this.state.eventTime=this.state.time;}
@@ -45,6 +45,11 @@ export class Settlement {
     if(!this.state.camp||!this.nav.route(this.state.camp,workPoint(p)))return false;
     this.state.wood-=V.cottageWood;p.upgrading=true;p.upgradeProgress=0;p.pendingWood=V.cottageWood;p.supplied=0;
     this.event('Cottage upgrade requested. Residents keep their shelter while followers deliver wood and build.');return true;
+  }
+  buildBoat(id:number){
+    const p=this.state.plots.find(p=>p.id===id&&p.kind==='dock'&&p.stage==='complete'&&p.valid);
+    if(!p||p.boatState!=='none'||this.state.wood<6)return false;
+    this.state.wood-=6;p.boatState='building';p.boatProgress=0;this.event('Boat construction has begun at the dock.');return true;
   }
   private deliveryPoint(w:Settler,id:number):Point|null{
     if(id===0)return this.state.camp;
@@ -66,7 +71,7 @@ export class Settlement {
     return this.metadata.assessPlot(kind==='farm'?'farm':'home',plotBounds(p),{reachable:true,unoccupied:true,freshWaterSupplied:true}).terrainSuitable;
   }
   private plannedNavigation(home?:Point){
-    const homes:Point[]=[...this.state.plots.filter(p=>p.kind!=='farm'&&p.valid),...this.state.orders.filter(o=>o.kind!=='farm')];
+    const homes:Point[]=[...this.state.plots.filter(p=>p.kind!=='farm'&&p.kind!=='dock'&&p.valid),...this.state.orders.filter(o=>o.kind!=='farm'&&o.kind!=='dock')];
     if(home)homes.push(home);
     return new Navigation(this.terrain,(x,z)=>homes.some(p=>Math.abs(x-p.x)<1.32&&Math.abs(z-p.z)<1.32));
   }
@@ -75,6 +80,11 @@ export class Settlement {
     if(kind==='settle')return this.settlePreview(point);
     if(kind==='rally')return this.beaconPreview(point);
     if(kind==='rain'||kind==='bloom')return this.powerPreview(kind,point);
+    if(kind==='dock'){
+      if(ignoreOrder)return {...point,kind:'dock',allowed:true,wood:BUILD_COST.dock,message:'Waiting for followers'};
+      const shore=this.foodSystem.preview('fishing',point);
+      return {...shore,kind:'dock',wood:BUILD_COST.dock,message:shore.allowed?`Mark a dock here · ${BUILD_COST.dock} wood${this.state.wood<BUILD_COST.dock?' to gather':''}`:shore.message};
+    }
     const p={x:Math.round(point.x*2)/2,z:Math.round(point.z*2)/2,kind:kind as BuildKind},s=this.state;
     const result=(allowed:boolean,message:string):GuidancePreview=>({...p,kind,allowed,message,wood:BUILD_COST[kind]});
     if(!s.camp||!s.settlers.length)return result(false,'Invite followers before guiding a new building.');
@@ -286,7 +296,7 @@ export class Settlement {
     this.state.plots.push({x:p.x,z:p.z,id:guidedId??this.id(),kind,guided:guidedId!==undefined,stage:'building',progress:0,valid:true,claimedBy:null,supplied:0,pendingWood:BUILD_COST[kind],
       moisture:.68,fertility:f.fertilityEstimate,crop:0,planted:false,harvests:0,
       ...((kind==='coop'||kind==='pigpen')?{stock:0,breed:0,fed:false,priority:'breed' as const,keeperId:null}:{}),
-      ...(kind==='temple'?{offerings:0}:kind==='slaughterhouse'?{livestock:0,rearing:false,rearingProgress:0,processed:0}:{})});
+      ...(kind==='temple'?{offerings:0}:kind==='slaughterhouse'?{livestock:0,rearing:false,rearingProgress:0,processed:0}:kind==='dock'?{boatState:'none' as const,boatProgress:0,boatTrips:0}:{})});
     this.nav.invalidate();this.needDiscovery=true;
     // A new home is an obstacle. Replan existing journeys before moving again.
     for(const w of this.state.settlers)if(w.job){
@@ -330,7 +340,7 @@ export class Settlement {
     const fields=plots.filter(p=>{const farmer=this.state.settlers.find(a=>a.id===p.farmerId);return !farmer||farmer.id===w.id||farmer.stranded||!this.nav.route(farmer,workPoint(p));});
     const ready=fields.filter(p=>p.kind==='farm'&&p.stage==='complete'&&p.planted&&p.crop>=1);
     for(const p of ready)if(this.assign(w,'harvest',p.id,workPoint(p)))return;
-    for(const p of plots.filter(p=>p.stage==='building'||p.upgrading)){
+    for(const p of plots.filter(p=>p.stage==='building'||p.upgrading||(p.kind==='dock'&&p.boatState==='building'))){
       if((p.supplied??constructionCost(p))>=constructionCost(p)){if(this.assign(w,'build',p.id,workPoint(p)))return;}
       else if((p.pendingWood??0)>0&&this.state.camp&&this.nav.route(this.state.camp,workPoint(p))&&this.assign(w,'supply',p.id,this.state.camp))return;
     }
@@ -409,11 +419,16 @@ export class Settlement {
       return;
     }
     if(job.kind==='build'){
+      if(p.kind==='dock'&&p.stage==='complete'&&p.boatState==='building'){
+        w.heading=Math.atan2(p.x-w.x,p.z-w.z);p.boatProgress=Math.min(1,(p.boatProgress??0)+dt/22);
+        if(p.boatProgress>=1){p.boatState='at-sea';p.boatReturnAt=this.state.time+60;this.release(w);this.event('The new fishing boat has sailed beyond the island.');}
+        return;
+      }
       if((p.supplied??constructionCost(p))<constructionCost(p)){this.release(w);return;}
       w.heading=Math.atan2(p.x-w.x,p.z-w.z);
       if(p.upgrading){p.upgradeProgress=Math.min(1,(p.upgradeProgress??0)+dt/V.cottageSeconds);if(p.upgradeProgress>=1){p.level=2;p.upgrading=false;delete p.supplied;delete p.pendingWood;this.release(w);this.event('A cottage is ready. Six followers can shelter here.');}return;}
       p.progress=Math.min(1,p.progress+dt/BUILD_TIME[p.kind]);
-      if(p.progress>=1){p.stage='complete';delete p.supplied;delete p.pendingWood;if(p.kind==='slaughterhouse')p.livestock=2;if(p.kind==='farm'&&!p.farmerId)p.farmerId=this.state.settlers.find(a=>!this.state.plots.some(f=>f.farmerId===a.id))?.id??null;this.release(w);this.event(p.kind==='torch'?'Your tiki torch is ready. It lights after dusk.':p.kind==='bonfire'?'Your bonfire is ready for evening gatherings.':p.kind==='home'?'A home is ready. Four settlers can shelter here.':p.kind==='farm'?'A field is ready for planting.':p.kind==='temple'?'The temple is ready. Cared-for followers will bring offerings.':p.kind==='coop'?'The chicken coop is ready. Assign a keeper to herd chickens to the coop.':p.kind==='pigpen'?'The pig pen is ready. Train a hunter and place traps.':p.kind==='granary'?'The granary is ready. Followers can deliver food here.':p.kind==='storehouse'?'The storehouse is ready. Followers can deliver wood here.':'The slaughterhouse is ready, with a breeding pair of goats.');}
+      if(p.progress>=1){p.stage='complete';delete p.supplied;delete p.pendingWood;if(p.kind==='slaughterhouse')p.livestock=2;if(p.kind==='farm'&&!p.farmerId)p.farmerId=this.state.settlers.find(a=>!this.state.plots.some(f=>f.farmerId===a.id))?.id??null;this.release(w);this.event(p.kind==='dock'?'The dock is ready. Build a fishing boat from its building card.':p.kind==='torch'?'Your tiki torch is ready. It lights after dusk.':p.kind==='bonfire'?'Your bonfire is ready for evening gatherings.':p.kind==='home'?'A home is ready. Four settlers can shelter here.':p.kind==='farm'?'A field is ready for planting.':p.kind==='temple'?'The temple is ready. Cared-for followers will bring offerings.':p.kind==='coop'?'The chicken coop is ready. Assign a keeper to herd chickens to the coop.':p.kind==='pigpen'?'The pig pen is ready. Train a hunter and place traps.':p.kind==='granary'?'The granary is ready. Followers can deliver food here.':p.kind==='storehouse'?'The storehouse is ready. Followers can deliver wood here.':'The slaughterhouse is ready, with a breeding pair of goats.');}
     }else if(job.kind==='worship'&&job.work>=4){
       const offering=Math.min(2,50-(p.offerings??0));p.offerings=(p.offerings??0)+offering;w.lastWorship=this.state.time;this.release(w);this.event(`A follower left ${offering} faith at the temple. Collect its offerings.`);
     }else if(job.kind==='butcher'&&job.work>=8){
@@ -505,6 +520,12 @@ export class Settlement {
       n.regrowth+=dt*(this.raining&&n.kind==='wood'?2.5:this.raining?1.5:1);
       if(n.regrowth>=45){n.regrowth-=45;n.stock=Math.min(n.capacity,n.stock+1);}
     }
+    for(const p of s.plots)if(p.kind==='dock'&&p.valid&&p.stage==='complete'){
+      if(p.boatState==='at-sea'&&s.time>=(p.boatReturnAt??Infinity)){
+        const catchAmount=Math.min(18,Math.max(0,this.storage.food-s.food));s.food+=catchAmount;s.deliveredFood+=catchAmount;p.boatTrips=(p.boatTrips??0)+1;p.boatState='docked';p.boatReturnAt=s.time+18;
+        this.event(`The fishing boat returned with ${catchAmount} fish.`);
+      }else if(p.boatState==='docked'&&s.time>=(p.boatReturnAt??Infinity)){p.boatState='at-sea';p.boatReturnAt=s.time+60;this.event('The fishing boat has sailed for deeper water.');}
+    }
     for(const p of s.plots)if(p.kind==='farm'&&p.valid){
       p.moisture=Math.max(0,Math.min(1,p.moisture+dt*(this.wetAt(p)?.025:-(.0017+desertWeight(p.x,p.z)*.0015))));
       if(!p.planted)p.fertility=Math.min(.9,p.fertility+dt*.00008);
@@ -553,8 +574,9 @@ export class Settlement {
         detail:p.stage==='building'||p.upgrading?`${p.supplied??constructionCost(p)}/${constructionCost(p)} wood supplied · ${worker?worker.name:'No builder assigned'}`:p.kind==='torch'?'Lights automatically after dusk':p.kind==='bonfire'?'Up to 6 available followers gather here in the evening':p.kind==='home'?(residents.map(w=>w.name).join(', ')||'Room for new followers'):p.kind==='granary'||p.kind==='storehouse'?`Adds ${p.kind==='granary'?V.granaryFood+' food':V.storehouseWood+' wood'} capacity · Deliveries enter shared storage here`:p.kind==='temple'?(worker?`${worker.name} is visiting`:'Followers visit between duties when housed and fed'):p.kind==='coop'||p.kind==='pigpen'?'Manage keepers and breeding in Food & wildlife':p.kind==='slaughterhouse'?`${p.poultry??0} chickens + ${p.pork??0} pigs awaiting processing · Breeding pair protected · 4 feed → 10 food · ${p.processed??0} batches prepared`:`${p.farmerId?(s.settlers.find(w=>w.id===p.farmerId)?.name??'Farmer')+' tends this field · ':worker?worker.name+' · ':''}Water ${Math.round(p.moisture*100)}% · ${p.harvests} harvests`,
         progress:p.upgrading?p.upgradeProgress??0:p.stage==='building'?p.progress:p.kind==='farm'&&p.planted?p.crop:p.kind==='slaughterhouse'&&p.rearing?p.rearingProgress??0:null};
     });
+    const dockPlot=s.plots.find(p=>p.kind==='dock'&&p.valid&&p.stage==='complete'),dock=dockPlot?{id:dockPlot.id,state:dockPlot.boatState??'none',progress:dockPlot.boatProgress??0,trips:dockPlot.boatTrips??0,canBuild:dockPlot.boatState==='none'&&s.wood>=6}:null;
     const beacon=s.beacon?{id:s.beacon.id,remaining:Math.ceil(s.beacon.expires-s.time),message:`${s.beacon.members.filter(m=>m.phase==='arrived'||m.phase==='done').length}/${s.beacon.members.length} gathered · ${s.beacon.members.some(m=>m.phase==='waiting')?'Some need a route: sculpt single-layer steps':'Following your light'}`} : null;
-    return {storage:this.storage,foodSystem:this.foodSystem.status(),tier:s.tier,milestone:s.tier===2?'Tier 2 · Wider temple influence and blessings':`Tier 2: ${Math.min(2,homes)}/2 huts · ${s.harvestedFood>0?'1':'0'}/1 harvest delivered · ${s.plots.some(p=>p.kind==='temple'&&p.valid&&p.stage==='complete')?'1':'0'}/1 temple`,offerings:s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').reduce((n,p)=>n+(p.offerings??0),0),temples:s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').length,slaughterhouses:s.plots.filter(p=>p.kind==='slaughterhouse'&&p.valid&&p.stage==='complete').length,beacon,buildings,faithMessage:this.capacity<s.settlers.length?'Build shelter for everyone to earn steady faith.':s.food<=s.settlers.length*3?'Store more food to earn steady faith.':s.faith>=500?'Faith is full. Use a blessing to help your village.':`Your cared-for village earns ${(s.settlers.length*.008*60).toFixed(1)} faith per minute.`,population:s.settlers.length,sheltered:Math.min(this.capacity,s.settlers.length),homes,farms,
+    return {dock,storage:this.storage,foodSystem:this.foodSystem.status(),tier:s.tier,milestone:s.tier===2?'Tier 2 · Wider temple influence and blessings':`Tier 2: ${Math.min(2,homes)}/2 huts · ${s.harvestedFood>0?'1':'0'}/1 harvest delivered · ${s.plots.some(p=>p.kind==='temple'&&p.valid&&p.stage==='complete')?'1':'0'}/1 temple`,offerings:s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').reduce((n,p)=>n+(p.offerings??0),0),temples:s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').length,slaughterhouses:s.plots.filter(p=>p.kind==='slaughterhouse'&&p.valid&&p.stage==='complete').length,beacon,buildings,faithMessage:this.capacity<s.settlers.length?'Build shelter for everyone to earn steady faith.':s.food<=s.settlers.length*3?'Store more food to earn steady faith.':s.faith>=500?'Faith is full. Use a blessing to help your village.':`Your cared-for village earns ${(s.settlers.length*.008*60).toFixed(1)} faith per minute.`,population:s.settlers.length,sheltered:Math.min(this.capacity,s.settlers.length),homes,farms,
       food:Math.floor(s.food),wood:Math.floor(s.wood),faith:Math.floor(s.faith),day:Math.floor(s.time/DAY_SECONDS)+1,timeOfDay:timeOfDay(s.time),
       raining:this.raining,rain:s.rain,prayer:s.prayer?PRAYERS[s.prayer.kind]:null,
       objective:!s.settlers.length?'Invite two settlers to begin.':guidance.length?'Your followers are carrying out your guidance. Shape clear paths and keep them fed.':!homes?'Your settlers are gathering wood for shelter.':!farms?'A home is ready. Your settlers are preparing a field.':!s.harvestedFood?'Keep the fields watered until the first harvest.':'Your village is finding its rhythm. Make room for it to grow.',

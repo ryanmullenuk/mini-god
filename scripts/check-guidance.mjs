@@ -61,6 +61,18 @@ test('a requested farm takes priority over the automatic hut and only spends its
     conserved(sim,6);
   }finally{terrain.dispose();}
 });
+test('followers build a shoreline dock and fishing boat that returns with fish',()=>{
+  const terrain=new Terrain();try{
+    const sim=new Settlement(terrain);sim.add(2);sim.state.wood=80;sim.state.food=200;
+    let shore=null;for(let z=-95;z<=95&&!shore;z+=2)for(let x=-95;x<=95;x+=2){const preview=sim.guidancePreview('dock',{x,z});if(preview.allowed){shore={x,z};break;}}
+    assert.ok(shore,'Expected reachable shoreline for a dock');assert.ok(sim.guide('dock',shore).allowed);
+    for(let i=0;i<9000&&!sim.state.plots.some(p=>p.kind==='dock'&&p.stage==='complete');i++)sim.advance(.1);
+    const dock=sim.state.plots.find(p=>p.kind==='dock');assert.equal(dock?.stage,'complete',JSON.stringify({dock,workers:sim.state.settlers.map(w=>w.job)}));assert.equal(dock.boatState,'none');
+    assert.ok(sim.buildBoat(dock.id));run(sim,25);assert.equal(dock.boatState,'at-sea');const before=sim.state.food;
+    run(sim,61);assert.equal(dock.boatState,'docked');assert.equal(dock.boatTrips,1);assert.ok(sim.state.food>before);
+    const restored=decodeSave(encodeSave(terrain.values,sim.state,terrain.revision));assert.equal(restored.world.plots.find(p=>p.kind==='dock').boatTrips,1);
+  }finally{terrain.dispose();}
+});
 
 test('invalid, overlapping and conflicting planned entrances fail without charging or queuing',()=>{
   const {terrain,sim}=flat();try{

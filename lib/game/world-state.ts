@@ -13,10 +13,10 @@ export type PigTrap = Point & {id:number;phase:'planned'|'armed'|'caught'|'empty
 export type FoodState = {initialized:boolean;animals:WildAnimal[];fishing:FishingArea[];traps:PigTrap[];training:number[];hunting:number[];seed:number};
 export const newFoodState=():FoodState=>({initialized:false,animals:[],fishing:[],traps:[],training:[],hunting:[],seed:68129});
 export type JobKind = FoodJob | 'wood' | 'forage' | 'build' | 'plant' | 'harvest' | 'deliver' | 'clear' | 'rally' | 'worship' | 'butcher' | 'supply' | 'gather';
-export type BuildKind = 'home' | 'farm' | 'temple' | 'slaughterhouse' | 'coop' | 'pigpen' | 'granary' | 'storehouse' | 'torch' | 'bonfire';
-export const BUILD_LABEL: Record<BuildKind,string> = {torch:'Tiki torch',bonfire:'Bonfire',home:'Hut',farm:'Farm',temple:'Temple',slaughterhouse:'Slaughterhouse',coop:'Chicken coop',pigpen:'Pig pen',granary:'Granary',storehouse:'Storehouse'};
-export const BUILD_TIME = {torch:8,bonfire:16,granary:36,storehouse:32,home:24,farm:15,temple:48,slaughterhouse:36,coop:B.buildings.coop.seconds,pigpen:B.buildings.pigpen.seconds} as const;
-export const BUILD_COST = {torch:2,bonfire:5, granary: 12, storehouse: 10, home: 6, farm: 3, temple: 18, slaughterhouse: 12, coop: B.buildings.coop.wood, pigpen: B.buildings.pigpen.wood } as const;
+export type BuildKind = 'home' | 'farm' | 'dock' | 'temple' | 'slaughterhouse' | 'coop' | 'pigpen' | 'granary' | 'storehouse' | 'torch' | 'bonfire';
+export const BUILD_LABEL: Record<BuildKind,string> = {torch:'Tiki torch',bonfire:'Bonfire',home:'Hut',farm:'Farm',dock:'Dock',temple:'Temple',slaughterhouse:'Slaughterhouse',coop:'Chicken coop',pigpen:'Pig pen',granary:'Granary',storehouse:'Storehouse'};
+export const BUILD_TIME = {torch:8,bonfire:16,dock:28,granary:36,storehouse:32,home:24,farm:15,temple:48,slaughterhouse:36,coop:B.buildings.coop.seconds,pigpen:B.buildings.pigpen.seconds} as const;
+export const BUILD_COST = {torch:2,bonfire:5,dock:10,granary:12,storehouse:10,home:6,farm:3,temple:18,slaughterhouse:12,coop:B.buildings.coop.wood,pigpen:B.buildings.pigpen.wood} as const;
 export const VILLAGE_BALANCE={hutCapacity:4,cottageCapacity:6,cottageWood:12,cottageSeconds:45,carryWood:3,campFood:240,campWood:120,granaryFood:240,storehouseWood:120} as const;
 export const homeCapacity=(p:Plot)=>p.level===2?VILLAGE_BALANCE.cottageCapacity:VILLAGE_BALANCE.hutCapacity;
 export const constructionCost=(p:Plot)=>p.upgrading?VILLAGE_BALANCE.cottageWood:BUILD_COST[p.kind];
@@ -39,6 +39,7 @@ export type Plot = Point & {
   young?:number[]; stock?:number; breed?:number; fed?:boolean; priority?:'breed'|'food'; keeperId?:number|null; poultry?:number; pork?:number;
   level?:1|2; upgrading?:boolean; upgradeProgress?:number; supplied?:number; pendingWood?:number;
   guided?: boolean; farmerId?: number | null;
+  boatState?:'none'|'building'|'at-sea'|'docked';boatProgress?:number;boatReturnAt?:number;boatTrips?:number;
 };
 export type Resource = Point & {
   id: number; kind: 'wood' | 'forage'; stock: number; capacity: number; regrowth: number;
@@ -68,8 +69,9 @@ export type SettlementStatus = {
   objective: string; event: string; workers: { id: number; name: string; activity: string }[];
   harvestedFood: number; answered: number; opportunities: number;
   beacon: { id: number; message: string; remaining: number } | null;
-  buildings: { occupants:string|null; name:string; upgrade:{allowed:boolean;message:string}|null; workers:string; id: number; kind: BuildKind; farmerId: number | null; message: string; detail: string; progress: number | null }[];
+  buildings: { occupants:string|null; name:string; upgrade:{allowed:boolean;message:string}|null; boatBuild?:{allowed:boolean;message:string}|null; workers:string; id: number; kind: BuildKind; farmerId: number | null; message: string; detail: string; progress: number | null }[];
   faithMessage: string; tier: number; milestone: string; offerings: number; temples: number; slaughterhouses: number;
+  dock:{id:number;state:'none'|'building'|'at-sea'|'docked';progress:number;trips:number;canBuild:boolean}|null;
   guidance: { id: number; kind: BuildKind; message: string; cancellable: boolean; progress: number | null }[];
 };
 export function newWorld(): WorldState {

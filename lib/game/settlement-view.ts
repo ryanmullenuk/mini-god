@@ -5,7 +5,7 @@ import { SEA, type Terrain } from './terrain';
 import type { Settlement } from './settlement';
 import type { Plot, Resource } from './world-state';
 
-type PlotVisual={root:THREE.Group;building:THREE.Group;crops:THREE.Group;outline:THREE.Group;supplies:THREE.Group;animals:THREE.Group;offering:THREE.Mesh;previousOfferings:number;collectedUntil:number};
+type PlotVisual={root:THREE.Group;building:THREE.Group;boat:THREE.Group;crops:THREE.Group;outline:THREE.Group;supplies:THREE.Group;animals:THREE.Group;offering:THREE.Mesh;previousOfferings:number;collectedUntil:number};
 export class SettlementView {
   group=new THREE.Group();
   private plots=new Map<number,PlotVisual>();
@@ -52,7 +52,7 @@ export class SettlementView {
     this.box(g,.055,.025,size,color,-size/2,0,0);this.box(g,.055,.025,size,color,size/2,0,0);root.add(g);return g;
   }
   private makePlot(p:Plot){
-    const root=new THREE.Group(),building=new THREE.Group(),crops=new THREE.Group(),animals=new THREE.Group();root.add(building,crops,animals);
+    const root=new THREE.Group(),building=new THREE.Group(),boat=new THREE.Group(),crops=new THREE.Group(),animals=new THREE.Group();root.add(building,boat,crops,animals);
     if(p.kind==='torch'||p.kind==='bonfire'){
       const torch=p.kind==='torch',base=torch?1.05:.22;
       if(torch){
@@ -69,6 +69,13 @@ export class SettlementView {
       }
       const halo=new THREE.Mesh(new THREE.CircleGeometry(torch?.65:1.35,24),new THREE.MeshBasicMaterial({color:'#ffb951',transparent:true,opacity:.12,depthWrite:false,toneMapped:false}));
       halo.name='fire-halo';halo.rotation.x=-Math.PI/2;halo.position.y=.035;building.add(halo);
+    }else if(p.kind==='dock'){
+      for(let i=0;i<7;i++)this.box(building,1.65,.11,.28,i%2?'#9a7046':'#ae8354',0,.18,.25+i*.31);
+      for(const x of [-.72,.72])for(const z of [.2,1.2,2.1])this.mesh(building,new THREE.CylinderGeometry(.055,.075,.75,6),'#6f5338',x,-.08,z);
+      for(const x of [-.78,.78])this.box(building,.10,.18,2.25,'#795a3c',x,.26,1.15);
+      const hull=this.mesh(boat,new THREE.SphereGeometry(.58,8,5),'#8e552f',0,.32,2.45);hull.scale.set(1,.42,1.85);
+      this.box(boat,.82,.08,1.25,'#d3a160',0,.52,2.45);this.mesh(boat,new THREE.CylinderGeometry(.025,.035,1.55,6),'#725037',0,1.15,2.45);
+      const sail=this.mesh(boat,new THREE.ConeGeometry(.52,1.1,3),'#eee1b8',.18,1.27,2.45);sail.rotation.z=-Math.PI/2;sail.rotation.y=Math.PI/2;
     }else if(p.kind==='home'){building.scale.setScalar(B.visuals.hut);
       this.box(building,1.85,.11,1.85,'#d7c8a5',0,.04,0);
       this.box(building,1.62,1.18,1.52,'#f1ead7',0,.67,-.08);
@@ -158,7 +165,7 @@ export class SettlementView {
     const supplies=new THREE.Group();root.add(supplies);
     for(let i=0;i<6;i++)this.box(supplies,.55,.12,.14,'#a78551',1.18,.08+Math.floor(i/2)*.13,-.3+(i%2)*.18);
     const offering=this.mesh(root,new THREE.OctahedronGeometry(.2),'#ffdc82',0,3.5,0);offering.visible=false;
-    const visual={root,building,crops,outline,supplies,animals,offering,previousOfferings:p.offerings??0,collectedUntil:0};this.plots.set(p.id,visual);return visual;
+    const visual={root,building,boat,crops,outline,supplies,animals,offering,previousOfferings:p.offerings??0,collectedUntil:0};this.plots.set(p.id,visual);return visual;
   }
   private makeNode(n:Resource){
     const root=new THREE.Group(),crown=new THREE.Group();root.add(crown);
@@ -235,6 +242,12 @@ export class SettlementView {
       v.building.visible=p.valid;
       const complete=p.stage==='complete';
       v.building.scale.y=p.kind==='home'?B.visuals.hut:!complete?.15+p.progress*.85:1;
+      if(p.kind==='dock'){
+        let best={x:0,z:1,h:Infinity};for(let i=0;i<16;i++){const a=i*Math.PI/8,x=Math.sin(a)*3,z=Math.cos(a)*3,h=this.terrain.height(p.x+x,p.z+z);if(h<best.h)best={x,z,h};}
+        v.root.rotation.y=Math.atan2(best.x,best.z);v.boat.visible=complete&&p.boatState!=='none';
+        if(p.boatState==='building'){v.boat.position.z=0;v.boat.scale.setScalar(.18+.82*(p.boatProgress??0));}
+        else{v.boat.scale.setScalar(1);const remaining=Math.max(0,(p.boatReturnAt??s.time)-s.time),voyage=p.boatState==='at-sea'?Math.sin(Math.PI*(1-remaining/60))*48:0;v.boat.position.z=voyage;v.boat.position.y=Math.sin(s.time*2.2)*.05;}
+      }
       if(p.kind==='torch'||p.kind==='bonfire'){
         const fire=v.building.getObjectByName('fire')!,halo=v.building.getObjectByName('fire-halo')!;
         fire.visible=halo.visible=p.valid&&complete&&fireStrength>.01;
