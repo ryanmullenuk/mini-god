@@ -1,9 +1,22 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Navigation } from './navigation';
 import { Terrain, EXTENT } from './terrain';
 import type { Settler } from './world-state';
 const TAU=Math.PI*2;
+type IslanderModels={male:THREE.Object3D;female:THREE.Object3D};
+let modelCache:Promise<IslanderModels>|null=null;
+function loadIslanderModels(){
+ if(!modelCache){
+  const loader=new GLTFLoader();
+  modelCache=Promise.all([
+   loader.loadAsync('/models/islander-male.glb'),
+   loader.loadAsync('/models/islander-female.glb'),
+  ]).then(([male,female])=>({male:male.scene,female:female.scene}));
+ }
+ return modelCache;
+}
 /** Owned by one view; shared assets survive individual rigs and are freed on clear. */
 class PersonAssets {
  materials=new Map<string,THREE.MeshLambertMaterial>();
@@ -88,19 +101,43 @@ function makePerson(female:boolean,index:number,assets:PersonAssets){
 }
 type Person = ReturnType<typeof makePerson> & {
  x:number;z:number;angle:number;goal:{x:number;z:number}|null;idle:number;phase:number;
- kneel:number;speed:number;targetSpeed:number;previous:number;synced?:boolean;cargoMesh?:THREE.Mesh;
+ kneel:number;speed:number;targetSpeed:number;previous:number;synced?:boolean;cargoMesh?:THREE.Mesh;model?:THREE.Object3D;
 };
 export class Islanders{
  group=new THREE.Group();people:Person[]=[];elapsed=0;
  private nav:Navigation;
  private assets=new PersonAssets();
- constructor(private terrain:Terrain){this.nav=new Navigation(terrain);}
+ private models:IslanderModels|null=null;
+ private disposed=false;
+ constructor(private terrain:Terrain){
+  this.nav=new Navigation(terrain);
+  void loadIslanderModels().then(models=>{
+   if(this.disposed)return;
+   this.models=models;
+   this.people.forEach((person,index)=>this.installModel(person,index%2===1));
+  }).catch(()=>{ /* The procedural fallback remains usable if an asset cannot load. */ });
+ }
+ private installModel(person:Person,female:boolean){
+  if(person.model||!this.models)return;
+  const accessories=new Set(['builder-hammer','fishing-rod','hunting-spear','carried-animal']);
+  person.body.traverse(object=>{
+   if(!(object instanceof THREE.Mesh))return;
+   let parent:THREE.Object3D|null=object.parent,keep=false;
+   while(parent&&parent!==person.body){if(accessories.has(parent.name)){keep=true;break;}parent=parent.parent;}
+   if(!keep)object.visible=false;
+  });
+  const model=(female?this.models.female:this.models.male).clone(true);
+  model.name=female?'islander-female-model':'islander-male-model';
+  model.position.y=.952;model.scale.setScalar(.75);
+  model.traverse(object=>{if(object instanceof THREE.Mesh){object.castShadow=true;object.receiveShadow=true;}});
+  person.body.add(model);person.model=model;
+ }
  add(count=2){
   const added=Math.min(count,30-this.people.length);
   for(let k=0;k<added;k++){
    const i=this.people.length,rig=makePerson(i%2===1,i,this.assets);
    const p:Person={...rig,x:(i%4-1.5)*5-8,z:(Math.floor(i/4)%3-1)*5+1,angle:i*2.4,goal:null,idle:i*.19,phase:i*.47,kneel:0,speed:0,targetSpeed:.48+(i%3)*.035,previous:0};
-   this.people.push(p);this.group.add(rig.root);this.relocate(p);
+   this.people.push(p);this.group.add(rig.root);this.installModel(p,i%2===1);this.relocate(p);
   }
   return this.people.length;
  }
@@ -183,6 +220,6 @@ export class Islanders{
    p.skirt.rotation.z=Math.sin(phase)*.025*p.speed;
   }
  }
- clear(){this.dispose();this.assets=new PersonAssets();this.group.clear();this.people=[];this.elapsed=0;}
- dispose(){this.assets.dispose();}
+ clear(){this.assets.dispose();this.assets=new PersonAssets();this.group.clear();this.people=[];this.elapsed=0;}
+ dispose(){this.disposed=true;this.assets.dispose();this.group.clear();this.people=[];}
 }
