@@ -4,6 +4,7 @@ import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import ts from 'typescript';
+import {Raycaster,Vector3} from 'three';
 const root=fileURLToPath(new URL('../',import.meta.url));
 mkdirSync(resolve(root,'work'),{recursive:true});const temp=mkdtempSync(resolve(root,'work/animal-tests-'));
 after(()=>rmSync(temp,{recursive:true,force:true}));
@@ -78,5 +79,21 @@ test('walking to a building and farming do not display the construction hammer',
     const worker=sim.state.settlers[0];
     for(const job of [{kind:'build',route:[{x:1,z:3}]},{kind:'plant',route:[]},{kind:'worship',route:[]}]){worker.job={...job,target:100,work:0};people.sync(sim.state.settlers,.1,false);assert.equal(people.people[0].hammer.visible,false);}
     run(sim,.1);
+  }finally{people.dispose();terrain.dispose();}
+});
+test('harvesters carry and swing a scythe while other farm work keeps it hidden',()=>{
+  const {terrain,sim}=flat(),people=new Islanders(terrain);try{
+    const worker=sim.state.settlers[0];
+    worker.job={kind:'harvest',target:100,route:[],work:0};people.sync(sim.state.settlers,.1,false);
+    const rig=people.people[0],before=rig.scythe.rotation.y;assert.equal(rig.scythe.visible,true);
+    people.sync(sim.state.settlers,.2,false);assert.notEqual(rig.scythe.rotation.y,before);
+    worker.job={kind:'plant',target:100,route:[],work:0};people.sync(sim.state.settlers,.1,false);assert.equal(rig.scythe.visible,false);assert.equal(rig.hammer.visible,false);
+  }finally{people.dispose();terrain.dispose();}
+});
+test('islander models can be picked for the follow camera',()=>{
+  const {terrain,sim}=flat(),people=new Islanders(terrain);try{
+    people.sync(sim.state.settlers,.1,true);people.group.updateMatrixWorld(true);
+    const p=people.people[0].root.position,ray=new Raycaster(new Vector3(p.x,p.y+5,p.z),new Vector3(0,-1,0));
+    assert.equal(people.pick(ray),0);
   }finally{people.dispose();terrain.dispose();}
 });

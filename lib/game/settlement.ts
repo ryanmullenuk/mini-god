@@ -15,8 +15,8 @@ const PRAYERS:Record<PrayerKind,{title:string;message:string;reward:number}>={
   water:{title:'The fields are thirsty',message:'Rain would help our crops. Use the rain blessing, or wait for the next shower.',reward:6},
   ground:{title:'Help us find our footing',message:'Our land or route has changed. Shape a path beside the camp and buildings, with one-layer steps and room to stand between them.',reward:6},
 };
-export const plotBounds=(p:Point)=>({minX:p.x-1,maxX:p.x+1,minZ:p.z-1,maxZ:p.z+1});
-export const workPoint=(p:Point)=>({x:p.x,z:p.z+1.65});
+export const plotBounds=(p:Point&{kind?:BuildKind})=>{const r=p.kind==='farm'?1.65:1;return {minX:p.x-r,maxX:p.x+r,minZ:p.z-r,maxZ:p.z+r};};
+export const workPoint=(p:Point&{kind?:BuildKind})=>({x:p.x,z:p.z+(p.kind==='farm'?2.25:1.65)});
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.z-b.z);
 
 export class Settlement {
@@ -60,7 +60,7 @@ export class Settlement {
   }
   private id(){return this.state.nextId++;}
   private random(){let n=this.state.seed;n^=n<<13;n^=n>>>17;n^=n<<5;this.state.seed=n>>>0;return this.state.seed/4294967296;}
-  private fits(p:Point,ignoreOrder?:number){return ![...this.state.plots,...this.state.orders.filter(o=>o.id!==ignoreOrder)].some(b=>Math.abs(b.x-p.x)<2.8&&Math.abs(b.z-p.z)<2.8)&&
+  private fits(p:Point&{kind?:BuildKind},ignoreOrder?:number){return ![...this.state.plots,...this.state.orders.filter(o=>o.id!==ignoreOrder)].some(b=>{const gap=p.kind==='farm'||b.kind==='farm'?3.5:2.8;return Math.abs(b.x-p.x)<gap&&Math.abs(b.z-p.z)<gap;})&&
     (!this.state.camp||distance(p,this.state.camp)>2.9);}
   private physicalPlot(p:Point,kind:BuildKind){
     return this.metadata.assessPlot(kind==='farm'?'farm':'home',plotBounds(p),{reachable:true,unoccupied:true,freshWaterSupplied:true}).terrainSuitable;
@@ -75,7 +75,7 @@ export class Settlement {
     if(kind==='settle')return this.settlePreview(point);
     if(kind==='rally')return this.beaconPreview(point);
     if(kind==='rain'||kind==='bloom')return this.powerPreview(kind,point);
-    const p={x:Math.round(point.x*2)/2,z:Math.round(point.z*2)/2},s=this.state;
+    const p={x:Math.round(point.x*2)/2,z:Math.round(point.z*2)/2,kind:kind as BuildKind},s=this.state;
     const result=(allowed:boolean,message:string):GuidancePreview=>({...p,kind,allowed,message,wood:BUILD_COST[kind]});
     if(!s.camp||!s.settlers.length)return result(false,'Invite followers before guiding a new building.');
     if(!ignoreOrder&&(s.orders.length>=ORDER_LIMIT||s.plots.length+s.orders.length>=40))return result(false,'Finish or withdraw a request before marking another site.');
@@ -84,7 +84,7 @@ export class Settlement {
       const reasons=assessment.blockers;
       return result(false,reasons.includes('submerged')?'Raise dry land here first.':reasons.includes('invalid-bounds')||reasons.includes('out-of-bounds')?'Choose a site on the island.':reasons.includes('uneven-terrain')||reasons.includes('insufficient-clearance')?'Make a broad, flat terrace for this site.':'Find greener, fertile ground for a farm.');
     }
-    if(!this.fits(p,ignoreOrder))return result(false,'Leave room beside the camp, buildings and other requests.');
+    if(!this.fits(p,ignoreOrder))return result(false,'Leave room beside the camp, buildings and other requests, with a passage between them.');
     if([...s.foodSystem.traps,...s.foodSystem.fishing].some(a=>distance(a,p)<2.5))return result(false,'Leave room around traps and fishing shores.');
     if(s.resources.some(n=>distance(n,p)<1.8))return result(false,'Leave room beside trees and forage bushes.');
     const neighbours=[...s.plots,...s.orders.filter(o=>o.id!==ignoreOrder)];

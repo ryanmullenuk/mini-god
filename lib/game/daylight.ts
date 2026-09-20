@@ -6,8 +6,8 @@ const FRAMES=[
   {at:.12,sky:'#74b9df',air:'#d9f6ff',ground:'#92a372',sun:'#fff0d4',ambient:1.15,power:1.9,strength:1,tint:'#ffffff'},
   {at:.38,sky:'#68add8',air:'#e3f4ff',ground:'#92a372',sun:'#fff0cf',ambient:1.2,power:2.05,strength:1,tint:'#ffffff'},
   {at:.56,sky:'#786880',air:'#cba6b0',ground:'#8d7a68',sun:'#ffae7b',ambient:.95,power:1.12,strength:.62,tint:'#eed0bc'},
-  {at:.70,sky:'#111d34',air:'#859bc7',ground:'#5d6b8a',sun:'#a8c6f1',ambient:.68,power:.30,strength:0,tint:'#88a6cb'},
-  {at:.90,sky:'#111d34',air:'#859bc7',ground:'#5d6b8a',sun:'#a8c6f1',ambient:.68,power:.30,strength:0,tint:'#88a6cb'},
+  {at:.70,sky:'#111d34',air:'#91ace0',ground:'#62749a',sun:'#c4d9ff',ambient:.78,power:.72,strength:0,tint:'#9db9e4'},
+  {at:.90,sky:'#111d34',air:'#91ace0',ground:'#62749a',sun:'#c4d9ff',ambient:.78,power:.72,strength:0,tint:'#9db9e4'},
   {at:1,sky:'#65a8d1',air:'#e0f3ff',ground:'#9aa877',sun:'#ffe2ad',ambient:1.0,power:1.35,strength:.7,tint:'#f3f1e5'},
 ].map(f=>({...f,sky:new THREE.Color(f.sky),air:new THREE.Color(f.air),ground:new THREE.Color(f.ground),sun:new THREE.Color(f.sun),tint:new THREE.Color(f.tint)}));
 

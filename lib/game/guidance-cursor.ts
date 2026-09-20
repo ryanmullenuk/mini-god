@@ -40,7 +40,8 @@ export class GuidanceCursor {
     box(this.slaughterhouse,[1.7,1.1,.9],[0,.55,-.4],this.fill);
     box(this.slaughterhouse,[1.9,.12,1.9],[0,.06,0],this.fill);
     const area=new THREE.Mesh(new THREE.RingGeometry(.97,1,96),this.edge);area.rotation.x=-Math.PI/2;area.renderOrder=10;this.blessing.add(area);
-    for(let i=0;i<5;i++)box(this.farm,[.18,.09,1.9],[-.76+i*.38,.08,0],this.fill);
+    box(this.farm,[3.25,.07,3.25],[0,.035,0],this.fill);
+    box(this.farm,[.28,.10,3.15],[0,.10,0],this.edge);box(this.farm,[3.15,.10,.28],[0,.10,0],this.edge);
   }
   show(preview:GuidancePreview|null){
     this.group.visible=!!preview;if(!preview)return;

@@ -125,15 +125,34 @@ export class SettlementView {
         this.box(goat,.065,.025,.035,coat,-.18,.31,0).rotation.z=-.6;
       }
     }else{
-      this.box(building,1.94,.07,1.94,'#725f3d',0,.035,0);
-      for(let i=0;i<5;i++)this.box(building,.10,.065,1.85,'#947546',-.76+i*.38,.095,0);
-      for(let i=0;i<5;i++)for(let j=0;j<4;j++){
-        const crop=new THREE.Group();crop.position.set(-.76+i*.38,.09,-.68+j*.44);
-        this.mesh(crop,new THREE.CylinderGeometry(.025,.035,.48,5),'#839e47',0,.24,0);
-        this.mesh(crop,new THREE.ConeGeometry(.10,.23,5),'#d6bd60',0,.50,0);
-        this.box(crop,.22,.025,.055,'#95ad52',.07,.22,0).rotation.z=.45;crops.add(crop);
-      }
-      for(const x of [-1,1])for(const z of [-1,1])this.mesh(building,new THREE.CylinderGeometry(.025,.035,.35,5),'#a28d5b',x,.17,z);
+      // One larger field contains four distinct vegetable beds and walkable
+      // earth paths, so a harvest reads as a working farm rather than one crop.
+      this.box(building,3.25,.07,3.25,'#8a7045',0,.035,0);
+      for(const [x,z] of [[-.86,-.86],[.86,-.86],[-.86,.86],[.86,.86]] as const)this.box(building,1.42,.075,1.42,'#614d31',x,.09,z);
+      this.box(building,.30,.08,3.15,'#c3a56e',0,.13,0);this.box(building,3.15,.08,.30,'#c3a56e',0,.13,0);
+      const beds=[[-.86,-.86,'wheat'],[.86,-.86,'tomato'],[-.86,.86,'cabbage'],[.86,.86,'pumpkin']] as const;
+      beds.forEach(([bx,bz,kind])=>{
+        for(let i=0;i<5;i++){
+          const crop=new THREE.Group(),x=bx+(i%3-1)*.38,z=bz+(Math.floor(i/3)-.5)*.48;crop.position.set(x,.13,z);
+          if(kind==='wheat'){
+            this.mesh(crop,new THREE.CylinderGeometry(.018,.026,.42,5),'#779747',0,.21,0);
+            this.mesh(crop,new THREE.ConeGeometry(.075,.20,5),'#dabd55',0,.48,0);
+          }else if(kind==='tomato'){
+            this.mesh(crop,new THREE.CylinderGeometry(.018,.027,.38,5),'#60893e',0,.19,0);
+            for(const side of [-1,1])this.mesh(crop,new THREE.IcosahedronGeometry(.065,0),'#d95432',side*.08,.28,side*.025);
+            this.mesh(crop,new THREE.IcosahedronGeometry(.13,0),'#5f9a42',0,.35,0);
+          }else if(kind==='cabbage'){
+            for(let leaf=0;leaf<3;leaf++){const m=this.mesh(crop,new THREE.IcosahedronGeometry(.13-leaf*.018,0),leaf?'#74a947':'#8abb55',(leaf-1)*.06,.16+leaf*.035,0);m.scale.y=.65;}
+          }else{
+            this.mesh(crop,new THREE.CylinderGeometry(.016,.025,.25,5),'#5f873b',0,.13,0);
+            const fruit=this.mesh(crop,new THREE.IcosahedronGeometry(.14,1),'#dd8a28',.08,.18,0);fruit.scale.y=.76;
+          }
+          crops.add(crop);
+        }
+      });
+      for(const x of [-1.68,1.68])for(const z of [-1.68,1.68])this.mesh(building,new THREE.CylinderGeometry(.035,.05,.48,5),'#876b45',x,.24,z);
+      for(const z of [-1.68,1.68])this.box(building,3.35,.055,.07,'#9d7a4d',0,.28,z);
+      for(const x of [-1.68,1.68])this.box(building,.07,.055,3.35,'#9d7a4d',x,.28,0);
     }
     const outline=this.frame(root,'#e4be74');this.group.add(root);
     const supplies=new THREE.Group();root.add(supplies);

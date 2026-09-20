@@ -107,6 +107,9 @@ function makePerson(female:boolean,index:number,assets:PersonAssets){
  const hammer=new THREE.Group();hammer.name='builder-hammer';hammer.position.set(0,-.22,0);arms[1].elbow.add(hammer);
  const handle=part(hammer,new THREE.CylinderGeometry(.018,.022,.25,6),mat('#8b643b'),0,0,.11);handle.rotation.x=Math.PI/2;
  part(hammer,new THREE.BoxGeometry(.16,.07,.065),mat('#788481'),0,0,.245);hammer.visible=false;
+ const scythe=new THREE.Group();scythe.name='farmer-scythe';scythe.position.set(0,-.22,0);arms[1].elbow.add(scythe);
+ const scytheHandle=part(scythe,new THREE.CylinderGeometry(.014,.022,.72,6),mat('#8b643b'),0,.04,.30);scytheHandle.rotation.x=Math.PI/2;
+ const blade=part(scythe,new THREE.TorusGeometry(.19,.018,5,12,Math.PI*.72),mat('#c7d0cc'),-.12,.04,.64);blade.rotation.set(Math.PI/2,0,-.45);scythe.visible=false;
  const rod=new THREE.Group();rod.name='fishing-rod';arms[1].elbow.add(rod);rod.position.set(0,-.22,0);
  const cane=part(rod,new THREE.CylinderGeometry(.014,.02,1.6,5),mat('#a48352'),0,.3,.55);cane.rotation.x=.65;
  const line=part(rod,new THREE.CylinderGeometry(.004,.004,.8,3),mat('#e2dac2'),0,.25,1.04);line.rotation.x=-.4;rod.visible=false;
@@ -138,7 +141,7 @@ function makePerson(female:boolean,index:number,assets:PersonAssets){
   part(group,geometry,assets.combined);
  });
  root.traverse(o=>{if(o instanceof THREE.Mesh&&o.material!==assets.combined){const g=o.geometry as THREE.BufferGeometry&{parameters?:unknown};o.geometry=assets.geometry(`${g.type}:${JSON.stringify(g.parameters)}`,g);}});
- return {root,body,pelvis,torso,head,legs,arms,skirt,hammer,rod,spear,carried};
+ return {root,body,pelvis,torso,head,legs,arms,skirt,hammer,scythe,rod,spear,carried};
 }
 type Person = ReturnType<typeof makePerson> & {
  x:number;z:number;angle:number;goal:{x:number;z:number}|null;idle:number;phase:number;
@@ -160,7 +163,7 @@ export class Islanders{
  }
  private installModel(person:Person,female:boolean){
   if(person.model||!this.models)return;
-  const accessories=new Set(['builder-hammer','fishing-rod','hunting-spear','carried-animal']);
+  const accessories=new Set(['builder-hammer','farmer-scythe','fishing-rod','hunting-spear','carried-animal']);
   person.body.traverse(object=>{
    if(!(object instanceof THREE.Mesh))return;
    let parent:THREE.Object3D|null=object.parent,keep=false;
@@ -199,6 +202,11 @@ export class Islanders{
  validSegment(x:number,z:number,tx:number,tz:number){return this.nav.segment({x,z},{x:tx,z:tz});}
  chooseGoal(p:Person){for(let k=0;k<30;k++){const a=p.angle+(Math.random()-.5)*(k<12?2.3:TAU),d=.8+Math.random()*3.6;const x=p.x+Math.sin(a)*d,z=p.z+Math.cos(a)*d;if(this.validSegment(p.x,p.z,x,z)){p.goal={x,z};return;}}p.goal=null;p.idle=1+Math.random()*2;}
  terrainChanged(){for(const p of this.people){if(!this.safe(p.x,p.z))this.relocate(p);else{p.root.position.y=this.terrain.height(p.x,p.z);p.goal=null;p.idle=.15;}}}
+ pick(ray:THREE.Raycaster){
+  const hit=ray.intersectObjects(this.people.map(p=>p.root),true)[0];if(!hit)return null;
+  let root:THREE.Object3D=hit.object;while(root.parent&&root.parent!==this.group)root=root.parent;
+  const index=this.people.findIndex(p=>p.root===root);return index<0?null:index;
+ }
  update(dt:number,paused:boolean){if(paused)return;this.elapsed+=dt;
  for(const p of this.people){
  if(!p.root.visible){p.idle-=dt;if(p.idle<=0)this.relocate(p);continue;}
@@ -240,9 +248,10 @@ export class Islanders{
    p.carried.children.forEach((o,k)=>{(o as THREE.Mesh).material=this.assets.material(a.cargo.animal?.species==='chicken'?(k?'#d8ab48':'#e9dfbb'):(k?'#ce9883':'#e3b8a1'));});
    p.rod.visible=a.job?.kind==='fish';p.spear.visible=a.job?.kind==='hunt'||a.job?.kind==='train';
    p.hammer.visible=a.job?.kind==='build'&&!a.job.route.length&&!a.stranded;
+   p.scythe.visible=a.job?.kind==='harvest'&&!a.job.route.length&&!a.stranded;
    if(paused)continue;
    p.speed=THREE.MathUtils.damp(p.speed,a.moving?1:0,8,dt);p.phase+=dt*1.05*.61/(.29*p.root.scale.x)*p.speed;
-   const phase=p.phase*TAU,working=!!a.job&&!a.job.route.length&&a.job.kind!=='deliver'&&a.job.kind!=='rally',praying=working&&a.job?.kind==='worship',building=working&&a.job?.kind==='build'&&!a.stranded;
+   const phase=p.phase*TAU,working=!!a.job&&!a.job.route.length&&a.job.kind!=='deliver'&&a.job.kind!=='rally',praying=working&&a.job?.kind==='worship',building=working&&a.job?.kind==='build'&&!a.stranded,harvesting=working&&a.job?.kind==='harvest'&&!a.stranded;
    p.kneel=THREE.MathUtils.damp(p.kneel,building?1:0,12,dt);p.hammer.visible=building;
    p.torso.rotation.x=.2*p.kneel;p.head.rotation.x=.18*p.kneel;
    p.body.position.y=Math.cos(phase*2)*.009*p.speed-.295*p.kneel;p.torso.rotation.y=Math.sin(phase)*.055*p.speed;
@@ -266,6 +275,12 @@ export class Islanders{
     p.arms[j].elbow.rotation.x=THREE.MathUtils.lerp(p.arms[j].elbow.rotation.x,j===1?-.25-.9*swing:-.65,p.kneel);
    }
    if(working&&a.job?.kind==='fish'){p.arms[1].shoulder.rotation.x=-.9+Math.sin(this.elapsed*1.8)*.09;p.arms[1].elbow.rotation.x=-.45;}
+   if(harvesting){
+    const cut=.5+.5*Math.sin(this.elapsed*5.5+i*.8);p.torso.rotation.x=.30;p.torso.rotation.y=-.36+cut*.72;
+    p.arms[0].shoulder.rotation.x=-.82+cut*.18;p.arms[0].elbow.rotation.x=-.72;
+    p.arms[1].shoulder.rotation.x=-1.08+cut*.35;p.arms[1].elbow.rotation.x=-.48-cut*.38;
+    p.scythe.rotation.y=-.55+cut*1.10;
+   }
    if(working&&(a.job?.kind==='hunt'||a.job?.kind==='train')){p.arms[1].shoulder.rotation.x=-.8+Math.sin(this.elapsed*3)*.4;p.arms[1].elbow.rotation.x=-.5;}
    if(working&&['catch','feed','trap-set','trap-collect','animal-process'].includes(a.job!.kind)){p.torso.rotation.x=.3;p.head.rotation.x=.25;}
    p.skirt.rotation.z=Math.sin(phase)*.025*p.speed;

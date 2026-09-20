@@ -66,12 +66,14 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       // Fine crossed ripples deepen the troughs without adding a normal-map
       // texture or another reflection pass. The two different directions keep
       // the water organic while remaining stable at distant camera zooms.
-      float phaseA=dot(p,vec2(1.08,.46))+time*.58+warp.x*5.2;
-      float phaseB=dot(p,vec2(-.38,1.31))-time*.43+warp.y*4.4;
-      float phaseC=dot(p,vec2(.61,-.27))+time*.27+broad*4.1;
+      float fineWarp=(noise(p*.093+drift*2.7)-.5)*8.5+(noise(p*.217-drift*3.1)-.5)*2.8;
+      float crossWarp=(noise(p*.074-drift*2.1+31.)-.5)*7.3+(noise(p*.181+drift*2.4+7.)-.5)*3.2;
+      float phaseA=dot(p,vec2(1.08,.46))+time*.58+warp.x*5.2+fineWarp;
+      float phaseB=dot(p,vec2(-.38,1.31))-time*.43+warp.y*4.4+crossWarp;
+      float phaseC=dot(p,vec2(.61,-.27))+time*.27+broad*4.1+(fineWarp-crossWarp)*.22;
       float rippleA=sin(phaseA),rippleB=sin(phaseB),rippleC=sin(phaseC);
       float trough=(1.-rippleA)*.5*(.42+.58*(1.-rippleB)*.5);
-      colour*=.94+.06*broad+.018*swell-.022*trough;
+      colour*=.94+.06*broad+.012*swell-.006*trough;
       // Analytic wave slopes make the sunlight break into the long silver
       // strokes seen on wind-ruffled ocean, rather than one smooth highlight.
       vec2 slope=vec2(1.08,.46)*cos(phaseA)*.075
@@ -88,14 +90,16 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       vec2 sunAxis=normalize(sunDirection.xz+vec2(.0001));
       float across=dot(p,vec2(-sunAxis.y,sunAxis.x));
       float sunRoad=.18+.82*exp(-across*across/2500.);
-      float ridge=smoothstep(.42,.98,rippleA)
-        *(.28+.72*smoothstep(-.32,.82,rippleB+broad*.34));
+      vec2 reflectionSpace=vec2(dot(p,vec2(.91,.41))*.20,dot(p,vec2(-.41,.91))*.72);
+      float crestBreak=noise(reflectionSpace+vec2(time*.015,-time*.032)+warp*2.1);
+      float crestDetail=noise(p*.18+vec2(-time*.021,time*.013)+17.);
+      float ridge=smoothstep(.58,.90,crestBreak)*smoothstep(.24,.76,crestDetail);
       float glint=(softReflection*.22+sharpReflection*(.72+1.35*ridge))*sunRoad;
       float lightPower=mix(.045,.72,sunStrength);
       colour*=daylightTint;
       colour+=sunColour*glint*lightPower*(.72+.28*broad)*(.90+.10*swell);
       float silverStrokes=ridge*(.22+.78*softReflection)*sunRoad*smoothstep(.18,1.15,depth);
-      colour+=sunColour*silverStrokes*sunStrength*.075*(.76+.24*broad);
+      colour+=sunColour*silverStrokes*sunStrength*.045*(.76+.24*broad);
       // The wave wash is tied to actual submerged height, including sculpted bays.
       float shore=texture2D(shoreMap,clamp(uv,0.,1.)).r;
       float coastVariation=noise(p*.055)*.18;
