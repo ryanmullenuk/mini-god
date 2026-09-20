@@ -5,17 +5,58 @@ import { Navigation } from './navigation';
 import { Terrain, EXTENT } from './terrain';
 import type { Settler } from './world-state';
 const TAU=Math.PI*2;
-type IslanderModels={male:THREE.Object3D;female:THREE.Object3D};
+type RigAsset={geometry:THREE.BufferGeometry;material:THREE.Material|THREE.Material[]};
+type ModelRig={root:THREE.Group;hips:THREE.Bone;spine:THREE.Bone;thighs:THREE.Bone[];shins:THREE.Bone[];upperArms:THREE.Bone[];forearms:THREE.Bone[]};
+type IslanderModels={male:RigAsset;female:RigAsset};
 let modelCache:Promise<IslanderModels>|null=null;
+function skinGeometry(source:THREE.BufferGeometry,female:boolean){
+ const geometry=source.clone(),position=geometry.getAttribute('position'),indices=new Uint16Array(position.count*4),weights=new Float32Array(position.count*4);
+ const set=(i:number,a:number,aw=1,b=0,bw=0)=>{indices[i*4]=a;indices[i*4+1]=b;weights[i*4]=aw;weights[i*4+1]=bw;};
+ for(let i=0;i<position.count;i++){
+  const x=position.getX(i),y=position.getY(i),side=x<0?0:1;
+  if(y<-.08){
+   const thigh=side?4:2,shin=side?5:3;
+   if(y<-.56)set(i,shin);
+   else if(y<-.42){const t=THREE.MathUtils.smoothstep(y,-.56,-.42);set(i,shin,1-t,thigh,t);}
+   else set(i,thigh);
+  }else if(Math.abs(x)>(female?.145:.17)&&y<.56){
+   const upper=side?8:6,fore=side?9:7;
+   if(y<.06)set(i,fore);
+   else if(y<.18){const t=THREE.MathUtils.smoothstep(y,.06,.18);set(i,fore,1-t,upper,t);}
+   else set(i,upper);
+  }else if(y>.02)set(i,1);
+  else{const t=THREE.MathUtils.smoothstep(y,-.08,.02);set(i,0,1-t,1,t);}
+ }
+ geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(indices,4));
+ geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(weights,4));
+ return geometry;
+}
+function rigAsset(scene:THREE.Object3D,female:boolean):RigAsset{
+ let source:THREE.Mesh|null=null;scene.traverse(object=>{if(!source&&object instanceof THREE.Mesh)source=object;});
+ if(!source)throw new Error('Islander model contains no mesh');
+ return {geometry:skinGeometry((source as THREE.Mesh).geometry,female),material:(source as THREE.Mesh).material};
+}
 function loadIslanderModels(){
  if(!modelCache){
   const loader=new GLTFLoader();
   modelCache=Promise.all([
    loader.loadAsync('/models/islander-male.glb'),
    loader.loadAsync('/models/islander-female.glb'),
-  ]).then(([male,female])=>({male:male.scene,female:female.scene}));
+  ]).then(([male,female])=>({male:rigAsset(male.scene,false),female:rigAsset(female.scene,true)}));
  }
  return modelCache;
+}
+function makeModelRig(asset:RigAsset,female:boolean):ModelRig{
+ const mesh=new THREE.SkinnedMesh(asset.geometry,asset.material),hips=new THREE.Bone(),spine=new THREE.Bone();
+ hips.name='hips';hips.position.y=-.08;spine.name='spine';spine.position.y=.08;hips.add(spine);
+ const thighs:THREE.Bone[]=[],shins:THREE.Bone[]=[],upperArms:THREE.Bone[]=[],forearms:THREE.Bone[]=[];
+ for(const side of [-1,1]){
+  const thigh=new THREE.Bone(),shin=new THREE.Bone();thigh.name=side<0?'left-hip':'right-hip';thigh.position.set(side*.13,0,0);shin.name=side<0?'left-knee':'right-knee';shin.position.y=-.43;thigh.add(shin);hips.add(thigh);thighs.push(thigh);shins.push(shin);
+  const upper=new THREE.Bone(),fore=new THREE.Bone();upper.name=side<0?'left-shoulder':'right-shoulder';upper.position.set(side*(female?.23:.27),.35,0);fore.name=side<0?'left-elbow':'right-elbow';fore.position.y=-.30;upper.add(fore);spine.add(upper);upperArms.push(upper);forearms.push(fore);
+ }
+ mesh.add(hips);mesh.bind(new THREE.Skeleton([hips,spine,thighs[0],shins[0],thighs[1],shins[1],upperArms[0],forearms[0],upperArms[1],forearms[1]]));
+ mesh.castShadow=true;mesh.receiveShadow=true;const root=new THREE.Group();root.position.y=.952;root.scale.setScalar(.75);root.add(mesh);
+ return {root,hips,spine,thighs,shins,upperArms,forearms};
 }
 /** Owned by one view; shared assets survive individual rigs and are freed on clear. */
 class PersonAssets {
@@ -101,7 +142,7 @@ function makePerson(female:boolean,index:number,assets:PersonAssets){
 }
 type Person = ReturnType<typeof makePerson> & {
  x:number;z:number;angle:number;goal:{x:number;z:number}|null;idle:number;phase:number;
- kneel:number;speed:number;targetSpeed:number;previous:number;synced?:boolean;cargoMesh?:THREE.Mesh;model?:THREE.Object3D;
+ kneel:number;speed:number;targetSpeed:number;previous:number;synced?:boolean;cargoMesh?:THREE.Mesh;model?:ModelRig;
 };
 export class Islanders{
  group=new THREE.Group();people:Person[]=[];elapsed=0;
@@ -126,11 +167,20 @@ export class Islanders{
    while(parent&&parent!==person.body){if(accessories.has(parent.name)){keep=true;break;}parent=parent.parent;}
    if(!keep)object.visible=false;
   });
-  const model=(female?this.models.female:this.models.male).clone(true);
-  model.name=female?'islander-female-model':'islander-male-model';
-  model.position.y=.952;model.scale.setScalar(.75);
-  model.traverse(object=>{if(object instanceof THREE.Mesh){object.castShadow=true;object.receiveShadow=true;}});
-  person.body.add(model);person.model=model;
+  const model=makeModelRig(female?this.models.female:this.models.male,female);
+  model.root.name=female?'islander-female-model':'islander-male-model';
+  person.body.add(model.root);person.model=model;
+ }
+ private poseModel(person:Person){
+  const model=person.model;if(!model)return;
+  model.hips.rotation.z=person.pelvis.rotation.z;
+  model.spine.rotation.x=person.torso.rotation.x;model.spine.rotation.y=person.torso.rotation.y;
+  for(let i=0;i<2;i++){
+   model.thighs[i].rotation.x=person.legs[i].hip.rotation.x*.72;
+   model.shins[i].rotation.x=person.legs[i].knee.rotation.x*.72;
+   model.upperArms[i].rotation.x=person.arms[i].shoulder.rotation.x*.9;
+   model.forearms[i].rotation.x=person.arms[i].elbow.rotation.x*.82;
+  }
  }
  add(count=2){
   const added=Math.min(count,30-this.people.length);
@@ -172,6 +222,7 @@ export class Islanders{
  const c=Math.cos(phase+i*Math.PI);p.arms[i].shoulder.rotation.x=.29*c*p.speed;p.arms[i].elbow.rotation.x=-.18-.14*Math.max(0,-c)*p.speed;
  }
  p.skirt.rotation.z=Math.sin(phase)*.025*p.speed;
+ this.poseModel(p);
  }
  }
  sync(agents:readonly Settler[],dt:number,paused:boolean){
@@ -218,6 +269,7 @@ export class Islanders{
    if(working&&(a.job?.kind==='hunt'||a.job?.kind==='train')){p.arms[1].shoulder.rotation.x=-.8+Math.sin(this.elapsed*3)*.4;p.arms[1].elbow.rotation.x=-.5;}
    if(working&&['catch','feed','trap-set','trap-collect','animal-process'].includes(a.job!.kind)){p.torso.rotation.x=.3;p.head.rotation.x=.25;}
    p.skirt.rotation.z=Math.sin(phase)*.025*p.speed;
+   this.poseModel(p);
   }
  }
  clear(){this.assets.dispose();this.assets=new PersonAssets();this.group.clear();this.people=[];this.elapsed=0;}

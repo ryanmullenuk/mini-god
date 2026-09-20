@@ -325,6 +325,7 @@ export function archipelagoHeight(x:number,z:number){
   return THREE.MathUtils.clamp(h,-2,10.35);
 }
 const TROPICAL_PEAKS=[{x:39,z:-32,rx:13,rz:11,height:16.25},{x:55,z:-18,rx:10,rz:9,height:13.8},{x:-56,z:26,rx:10,rz:11,height:13.5}];
+export const VOLCANO={x:-60,z:-37,rx:18,rz:16};
 const TROPICAL_INLETS=[
   {a:{x:58,z:55},b:{x:58,z:91},width:8},
   {a:{x:-83,z:-22},b:{x:-112,z:-40},width:7},
@@ -334,12 +335,32 @@ const TROPICAL_INLETS=[
  * Every peak uses the same editable samples and one-layer navigation rules. */
 export function tropicalArchipelagoHeight(x:number,z:number){
   let h=archipelagoHeight(x,z);
+  // Broad overlapping lobes produce the irregular, substantial main island:
+  // long beaches around the outside and several village-sized interior plains.
+  for(const lobe of [{x:-43,z:-2,rx:67,rz:55},{x:38,z:4,rx:70,rz:58},{x:-2,z:38,rx:58,rz:42}]){
+    const u=(x-lobe.x)/lobe.rx,v=(z-lobe.z)/lobe.rz,a=Math.atan2(v,u);
+    const d=Math.hypot(u,v)*(1+.065*Math.sin(a*5+.4)+.035*Math.cos(a*7));
+    if(d<1.2)h=Math.max(h,Math.min(3.5+(1-d)*17,6.35+.16*Math.sin(x*.06)*Math.cos(z*.05)));
+  }
   // Open the round coastal basins into bays rather than landlocked shore pools.
   for(const inlet of TROPICAL_INLETS){
     const d=distanceToSegment(x,z,inlet.a,inlet.b)/inlet.width;
     if(d<1.6)h=Math.min(h,1.4+3.2*d*d);
   }
   if(h<5.8)return h;
+  // A broad volcanic cone dominates the north-west without consuming the
+  // central and eastern settlement plains. The centre is lowered into a crater.
+  {
+    const u=(x-VOLCANO.x)/VOLCANO.rx,v=(z-VOLCANO.z)/VOLCANO.rz,a=Math.atan2(v,u);
+    const r=Math.hypot(u,v)*(1+.08*Math.sin(a*6));
+    if(r<1)h=Math.max(h,6.25+10.05*Math.pow(1-r,1.08));
+    if(r<.19)h=Math.min(h,12.2+12*r);
+  }
+  // Raised spring terrace and a lower plunge pool establish the waterfall.
+  const fallShelf=Math.hypot((x-WATERFALL.x)/13,(z+10)/12);
+  if(fallShelf<1&&z<-3)h=Math.max(h,6.25+4.2*Math.pow(1-fallShelf,1.2));
+  const plunge=Math.hypot((x-WATERFALL.x)/8,(z-2)/9);
+  if(plunge<1)h=Math.min(h,1.0+3.0*plunge*plunge);
   for(const peak of TROPICAL_PEAKS){
     const u=(x-peak.x)/peak.rx,v=(z-peak.z)/peak.rz;
     const angle=Math.atan2(v,u),r=Math.hypot(u,v)*(1+.11*Math.sin(angle*5+.7)+.06*Math.cos(angle*3));

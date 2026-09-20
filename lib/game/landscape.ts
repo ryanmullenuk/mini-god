@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { EXTENT, SEA, FIRST_DRY_LAYER, desertWeight, vegetationBiome, type Terrain } from './terrain';
+import { EXTENT, SEA, FIRST_DRY_LAYER, VOLCANO, WATERFALL, desertWeight, vegetationBiome, type Terrain } from './terrain';
 import type { WorldState } from './world-state';
 
 /** Instanced scenery: grassland groves, upland pines and palms on sandy shores.
@@ -21,6 +21,7 @@ export class Landscape {
   private flowers:THREE.InstancedMesh;
   private seaRocks:THREE.InstancedMesh;
   private rockFoam:THREE.InstancedMesh;
+  private landmarks=new THREE.Group();
   constructor(private terrain:Terrain){
     const batch=(name:string,geometry:THREE.BufferGeometry,color:string,count:number,sway=0)=>{
       const material=new THREE.MeshLambertMaterial({color,flatShading:true});
@@ -83,6 +84,22 @@ export class Landscape {
           #include <colorspace_fragment>
         }`});
     this.rockFoam=new THREE.InstancedMesh(foamGeometry,foamMaterial,1000);this.rockFoam.name='Boulder foam';this.rockFoam.count=0;this.rockFoam.frustumCulled=false;this.rockFoam.renderOrder=3;this.group.add(this.rockFoam);
+    this.makeLandmarks();
+  }
+  private makeLandmarks(){
+    this.landmarks.name='Volcano and waterfall';
+    const lava=new THREE.MeshBasicMaterial({color:'#ff5a1f',toneMapped:false}),dark=new THREE.MeshLambertMaterial({color:'#3d3937',flatShading:true});
+    const crater=new THREE.Mesh(new THREE.TorusGeometry(2.1,.48,7,18),dark);crater.rotation.x=-Math.PI/2;
+    crater.position.set(VOLCANO.x,this.terrain.height(VOLCANO.x,VOLCANO.z)+.10,VOLCANO.z);crater.castShadow=true;this.landmarks.add(crater);
+    const glow=new THREE.Mesh(new THREE.CircleGeometry(1.72,24),lava);glow.rotation.x=-Math.PI/2;glow.position.set(VOLCANO.x,crater.position.y+.08,VOLCANO.z);glow.renderOrder=2;this.landmarks.add(glow);
+    for(let i=0;i<5;i++){const smoke=new THREE.Mesh(new THREE.IcosahedronGeometry(.55+i*.16,1),new THREE.MeshLambertMaterial({color:i<2?'#625b55':'#aaa9a1',transparent:true,opacity:.45-i*.045,depthWrite:false}));smoke.position.set(VOLCANO.x+Math.sin(i*2.1)*.6,crater.position.y+1.2+i*.82,VOLCANO.z+Math.cos(i*1.7)*.5);this.landmarks.add(smoke);}
+    const top=this.terrain.height(WATERFALL.x,WATERFALL.sourceZ),bottom=Math.max(SEA+.12,this.terrain.height(WATERFALL.x,1)),height=Math.max(1.5,top-bottom);
+    const water=new THREE.MeshBasicMaterial({color:'#bceff2',transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false});
+    const sheet=new THREE.Mesh(new THREE.PlaneGeometry(WATERFALL.width,height,8,10),water);sheet.name='Waterfall';sheet.position.set(WATERFALL.x,bottom+height/2,-2.75);sheet.rotation.y=Math.PI;sheet.renderOrder=3;this.landmarks.add(sheet);
+    const stream=new THREE.Mesh(new THREE.PlaneGeometry(WATERFALL.width*.7,6,4,8),water);stream.rotation.x=-Math.PI/2;stream.position.set(WATERFALL.x,top+.08,-6);stream.renderOrder=3;this.landmarks.add(stream);
+    const mist=new THREE.Mesh(new THREE.RingGeometry(.5,3.2,32),new THREE.MeshBasicMaterial({color:'#e8ffff',transparent:true,opacity:.30,depthWrite:false,side:THREE.DoubleSide}));mist.rotation.x=-Math.PI/2;mist.position.set(WATERFALL.x,bottom+.12,-2.4);mist.renderOrder=4;this.landmarks.add(mist);
+    // Keep the nine top-level instanced batches stable for fast scenery updates.
+    this.rocks.add(this.landmarks);
   }
   setLighting(tint:THREE.Color){this.daylightTint.value.copy(tint);}
   terrainChanged(){this.dirty=true;}
@@ -91,7 +108,7 @@ export class Landscape {
     const key=`${state.camp?.x},${state.camp?.z}:${state.plots.map(p=>`${p.id}:${p.valid}`).join(',')}:${state.orders.map(p=>p.id).join(',')}:${state.resources.length}:${state.foodSystem.fishing.map(a=>a.id).join(',')}`;
     if(!this.dirty&&this.key===key)return;
     this.key=key;this.dirty=false;
-    for(const mesh of this.group.children as THREE.InstancedMesh[])mesh.count=0;
+    for(const mesh of this.group.children)if(mesh instanceof THREE.InstancedMesh)mesh.count=0;
     let seed=41287;
     const random=()=>{seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;};
     const colour=new THREE.Color();
@@ -191,7 +208,11 @@ export class Landscape {
         put(this.rockFoam,rx,SEA+.055,rz,size,1,size*.85);
       }
     }
-    for(const mesh of this.group.children as THREE.InstancedMesh[]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}
+    for(const mesh of this.group.children)if(mesh instanceof THREE.InstancedMesh){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}
   }
-  dispose(){for(const mesh of this.group.children as THREE.InstancedMesh[]){mesh.geometry.dispose();(mesh.material as THREE.Material).dispose();}this.group.clear();}
+  dispose(){
+    const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
+    this.group.traverse(object=>{if(object instanceof THREE.Mesh){geometries.add(object.geometry);for(const material of Array.isArray(object.material)?object.material:[object.material])materials.add(material);}});
+    geometries.forEach(geometry=>geometry.dispose());materials.forEach(material=>material.dispose());this.group.clear();
+  }
 }
