@@ -17,7 +17,7 @@ export type BuildKind = 'home' | 'farm' | 'dock' | 'temple' | 'slaughterhouse' |
 export const BUILD_LABEL: Record<BuildKind,string> = {torch:'Tiki torch',bonfire:'Bonfire',home:'Hut',farm:'Farm',dock:'Dock',temple:'Temple',slaughterhouse:'Slaughterhouse',coop:'Chicken coop',pigpen:'Pig pen',granary:'Granary',storehouse:'Storehouse'};
 export const BUILD_TIME = {torch:8,bonfire:16,dock:28,granary:36,storehouse:32,home:24,farm:15,temple:48,slaughterhouse:36,coop:B.buildings.coop.seconds,pigpen:B.buildings.pigpen.seconds} as const;
 export const BUILD_COST = {torch:2,bonfire:5,dock:10,granary:12,storehouse:10,home:6,farm:3,temple:18,slaughterhouse:12,coop:B.buildings.coop.wood,pigpen:B.buildings.pigpen.wood} as const;
-export const VILLAGE_BALANCE={hutCapacity:4,cottageCapacity:6,cottageWood:12,cottageSeconds:45,carryWood:3,campFood:240,campWood:120,granaryFood:240,storehouseWood:120} as const;
+export const VILLAGE_BALANCE={hutCapacity:5,cottageCapacity:7,cottageWood:12,cottageSeconds:45,carryWood:3,campFood:240,campWood:120,granaryFood:240,storehouseWood:120,maxPopulation:100} as const;
 export const homeCapacity=(p:Plot)=>p.level===2?VILLAGE_BALANCE.cottageCapacity:VILLAGE_BALANCE.hutCapacity;
 export const constructionCost=(p:Plot)=>p.upgrading?VILLAGE_BALANCE.cottageWood:BUILD_COST[p.kind];
 export const ORDER_LIMIT = 8;
@@ -31,6 +31,7 @@ export type Settler = Point & {
   lastGather?: number; lastWorship?: number; huntingSkill?:number; weapon?:boolean;
   job: Job | null; cargo: { wood: number; food: number; harvest: number; boatFish?:number; animal?: {species:Species;destination:number}; feed?:number; construction?:{site:number;wood:number} };
 };
+export type FishingBoat = {state:'building'|'at-sea'|'docked';progress:number;returnAt:number;departAt:number;trips:number;fish:number;targetX?:number;targetZ?:number;schoolId?:number};
 export type Plot = Point & {
   id: number; kind: BuildKind; stage: 'building' | 'complete'; progress: number;
   valid: boolean; claimedBy: number | null; moisture: number; fertility: number;
@@ -40,6 +41,7 @@ export type Plot = Point & {
   level?:1|2; upgrading?:boolean; upgradeProgress?:number; supplied?:number; pendingWood?:number;
   guided?: boolean; farmerId?: number | null;
   boatState?:'none'|'building'|'at-sea'|'docked';boatProgress?:number;boatReturnAt?:number;boatTrips?:number;boatFish?:number;boatDepartAt?:number;boatTargetX?:number;boatTargetZ?:number;boatSchoolId?:number;
+  boats?:FishingBoat[];
 };
 export type FishSchool = Point & {id:number;visits:number;regenAt:number};
 export type Resource = Point & {
@@ -72,7 +74,7 @@ export type SettlementStatus = {
   beacon: { id: number; message: string; remaining: number } | null;
   buildings: { occupants:string|null; name:string; upgrade:{allowed:boolean;message:string}|null; boatBuild?:{allowed:boolean;message:string}|null; workers:string; id: number; kind: BuildKind; farmerId: number | null; message: string; detail: string; progress: number | null }[];
   faithMessage: string; tier: number; milestone: string; offerings: number; temples: number; slaughterhouses: number;
-  dock:{id:number;state:'none'|'building'|'at-sea'|'docked';progress:number;trips:number;fish:number;hasStore:boolean;canBuild:boolean}|null;
+  dock:{id:number;state:'none'|'building'|'at-sea'|'docked';progress:number;trips:number;fish:number;ships:number;atSea:number;queued:number;hasStore:boolean;canBuild:boolean}|null;
   guidance: { id: number; kind: BuildKind; message: string; cancellable: boolean; progress: number | null }[];
 };
 export function newWorld(): WorldState {

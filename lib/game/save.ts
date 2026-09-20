@@ -71,10 +71,13 @@ export function decodeSave(raw:string):IslandSave{
   for(const key of ['food','wood','faith','rain','blessing','answered','deliveredFood','deliveredWood','harvestedFood','consumedFood','eventTime'])if(!finite(s[key],0,1e9))fail();
   if(typeof s.lastEvent!=='string'||s.lastEvent.length>500||!record(s.prayerCooldown))return fail();
   for(const [key,value] of Object.entries(s.prayerCooldown))if(!['shelter','food','water','ground'].includes(key)||!finite(value,0,1e9))fail();
-  const groups=[['settlers',30],['plots',40],['resources',60],['trails',5000],['fishSchools',8],['orders',ORDER_LIMIT]] as const;
+  const groups=[['settlers',V.maxPopulation],['plots',40],['resources',60],['trails',5000],['fishSchools',8],['orders',ORDER_LIMIT]] as const;
   for(const [key,max] of groups)if(!Array.isArray(s[key])||(s[key] as unknown[]).length>max)return fail();
   const settlers=s.settlers as unknown[],plots=s.plots as unknown[],resources=s.resources as unknown[],trails=s.trails as unknown[],fishSchools=s.fishSchools as unknown[],orders=s.orders as unknown[];
-  for(const entry of plots)if(record(entry)&&entry.kind==='dock'&&entry.boatFish===undefined)entry.boatFish=0;
+  for(const entry of plots)if(record(entry)&&entry.kind==='dock'){
+    if(entry.boatFish===undefined)entry.boatFish=0;
+    if(!Array.isArray(entry.boats))entry.boats=entry.boatState&&entry.boatState!=='none'?[{state:entry.boatState,progress:entry.boatProgress??0,returnAt:entry.boatReturnAt??0,departAt:entry.boatDepartAt??0,trips:entry.boatTrips??0,fish:entry.boatFish??0,targetX:entry.boatTargetX,targetZ:entry.boatTargetZ,schoolId:entry.boatSchoolId}]:[];
+  }
   if(plots.length+orders.length>40||orders.length>0&&!settlers.length)fail();
   const ids=new Set<number>(),workerIds=new Set<number>();
   for(const entry of [...settlers,...plots,...resources,...orders]){
@@ -108,7 +111,8 @@ export function decodeSave(raw:string):IslandSave{
   }
   for(const p of plots){
     if(!record(p)||!['home','farm','dock','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(p.kind as string)||!['building','complete'].includes(p.stage as string)||!finite(p.progress,0,1)||!finite(p.moisture,0,1)||!finite(p.fertility,0,1)||!finite(p.crop,0,1)||!integer(p.harvests)||typeof p.valid!=='boolean'||typeof p.planted!=='boolean'||!(p.claimedBy===null||workerIds.has(p.claimedBy as number)))return fail();
-    if(p.kind==='dock'&&(!['none','building','at-sea','docked'].includes(p.boatState as string)||!finite(p.boatProgress,0,1)||!integer(p.boatTrips)||!integer(p.boatFish,0,20)||p.boatDepartAt!==undefined&&!finite(p.boatDepartAt,0,s.time)||p.boatReturnAt!==undefined&&!finite(p.boatReturnAt,0,1e9)||p.boatTargetX!==undefined&&!finite(p.boatTargetX,-EXTENT/2,EXTENT/2)||p.boatTargetZ!==undefined&&!finite(p.boatTargetZ,-EXTENT/2,EXTENT/2)||p.boatSchoolId!==undefined&&!integer(p.boatSchoolId,1,8)))fail();
+    if(p.kind==='dock'&&(!['none','building','at-sea','docked'].includes(p.boatState as string)||!finite(p.boatProgress,0,1)||!integer(p.boatTrips)||!integer(p.boatFish,0,20)||!Array.isArray(p.boats)||p.boats.length>5))fail();
+    if(p.kind==='dock')for(const boat of p.boats as unknown[]){if(!record(boat)||!['building','at-sea','docked'].includes(boat.state as string)||!finite(boat.progress,0,1)||!finite(boat.returnAt,0,1e9)||!finite(boat.departAt,0,s.time)||!integer(boat.trips)||!integer(boat.fish,0,20)||boat.targetX!==undefined&&!finite(boat.targetX,-EXTENT/2,EXTENT/2)||boat.targetZ!==undefined&&!finite(boat.targetZ,-EXTENT/2,EXTENT/2)||boat.schoolId!==undefined&&!integer(boat.schoolId,1,8))fail();}
     if(p.kind==='temple'&&!integer(p.offerings,0,50))fail();
     if(p.kind==='slaughterhouse'&&(!integer(p.livestock,p.stage==='complete'?2:0,4)||typeof p.rearing!=='boolean'||!finite(p.rearingProgress,0,1)||!integer(p.processed)))fail();
     if(p.farmerId!==undefined&&p.farmerId!==null&&(p.kind!=='farm'||!workerIds.has(p.farmerId as number)))fail();
@@ -149,12 +153,13 @@ export function decodeSave(raw:string):IslandSave{
     if(job.kind==='clear'){if(!orders.some(o=>(o as Record<string,unknown>).id===job.target))fail();continue;}
     const list=job.kind==='wood'||job.kind==='forage'?resources:plots;
     const target=list.find(v=>(v as Record<string,unknown>).id===job.target) as Record<string,unknown>|undefined;
-    if(!target||target.claimedBy!==worker.id)fail();
+    if(!target)fail();
+    if(job.kind==='unload-boat'){if(target.kind!=='dock'||target.stage!=='complete'||!Array.isArray(target.boats)||!integer(job.destination,0,4)||!record(target.boats[job.destination as number])||target.boats[job.destination as number].state!=='docked')fail();continue;}
+    if(target.claimedBy!==worker.id)fail();
     if((job.kind==='wood'||job.kind==='forage')&&target.kind!==job.kind)fail();
     if(job.kind==='worship'&&(target.kind!=='temple'||target.stage!=='complete'))fail();
     if(job.kind==='butcher'&&(target.kind!=='slaughterhouse'||target.stage!=='complete'))fail();
-    if(job.kind==='unload-boat'&&(target.kind!=='dock'||target.stage!=='complete'||target.boatState!=='docked'))fail();
-    if((job.kind==='build'||job.kind==='supply')&&target.stage!=='building'&&!target.upgrading&&!(job.kind==='build'&&target.kind==='dock'&&target.boatState==='building'))fail();
+    if((job.kind==='build'||job.kind==='supply')&&target.stage!=='building'&&!target.upgrading&&!(job.kind==='build'&&target.kind==='dock'&&Array.isArray(target.boats)&&target.boats.some(b=>record(b)&&b.state==='building')))fail();
     if((job.kind==='plant'||job.kind==='harvest')&&(target.kind!=='farm'||target.stage!=='complete'))fail();
   }
   for(const n of [...plots,...resources]){

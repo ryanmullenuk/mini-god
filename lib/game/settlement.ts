@@ -4,7 +4,7 @@ import { TerrainMetadata } from './terrain-metadata';
 import { Navigation } from './navigation';
 import { EXTENT, FIRST_DRY_LAYER, SEA, desertWeight, type Terrain } from './terrain';
 import { DAY_SECONDS, timeOfDay, newWorld, VILLAGE_BALANCE as V, homeCapacity, constructionCost, BUILD_COST, BUILD_LABEL, BUILD_TIME, ORDER_LIMIT, type BuildKind, type GuidanceKind, type BuildOrder, type GuidancePreview, type WorldState, type Point, type Settler, type JobKind,
-  type Opportunity, type PrayerKind, type SettlementStatus } from './world-state';
+  type FishingBoat, type Opportunity, type PrayerKind, type SettlementStatus } from './world-state';
 
 export const SIM_STEP = .1;
 export const POWER_COST = { rain: 8, bloom: 12 } as const;
@@ -30,7 +30,9 @@ export class Settlement {
   private orderMessages=new Map<number,string>();
 
   constructor(readonly terrain:Terrain,state?:WorldState,createWaterWorker?:()=>Worker){
-    this.state=state??newWorld();this.state.fishSchools??=[];this.seedFishSchools();this.metadata=new TerrainMetadata(terrain,undefined,createWaterWorker);
+    this.state=state??newWorld();this.state.fishSchools??=[];
+    for(const p of this.state.plots)if(p.kind==='dock'&&!p.boats){p.boats=p.boatState&&p.boatState!=='none'?[{state:p.boatState,progress:p.boatProgress??0,returnAt:p.boatReturnAt??0,departAt:p.boatDepartAt??0,trips:p.boatTrips??0,fish:p.boatFish??0,targetX:p.boatTargetX,targetZ:p.boatTargetZ,schoolId:p.boatSchoolId}]:[];}
+    this.seedFishSchools();this.metadata=new TerrainMetadata(terrain,undefined,createWaterWorker);
     this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='farm'&&p.kind!=='dock'&&p.valid&&Math.abs(x-p.x)<1.32&&Math.abs(z-p.z)<1.32));
     this.foodSystem=new FoodSystem(()=>this.state,terrain,this.nav,(w,k,id,p)=>this.assign(w,k,id,p),w=>this.release(w));
   }
@@ -54,10 +56,10 @@ export class Settlement {
     }
     return true;
   }
-  private sendBoat(p:WorldState['plots'][number]){
+  private sendBoat(p:WorldState['plots'][number],boat:FishingBoat){
     const school=this.state.fishSchools.filter(s=>s.visits<10).filter(s=>this.clearSeaRoute(p,s)).sort((a,b)=>distance(p,a)-distance(p,b))[0];
     if(!school)return false;
-    p.boatState='at-sea';p.boatDepartAt=this.state.time;p.boatReturnAt=this.state.time+60;p.boatTargetX=school.x;p.boatTargetZ=school.z;p.boatSchoolId=school.id;
+    boat.state='at-sea';boat.departAt=this.state.time;boat.returnAt=this.state.time+60;boat.targetX=school.x;boat.targetZ=school.z;boat.schoolId=school.id;
     this.event('The fishing boat has set sail for a deep-water fish school.');return true;
   }
   private event(message:string){this.state.lastEvent=message;this.state.eventTime=this.state.time;}
@@ -74,8 +76,8 @@ export class Settlement {
   }
   buildBoat(id:number){
     const p=this.state.plots.find(p=>p.id===id&&p.kind==='dock'&&p.stage==='complete'&&p.valid);
-    if(!p||p.boatState!=='none'||this.state.wood<6)return false;
-    this.state.wood-=6;p.boatState='building';p.boatProgress=0;this.event('Boat construction has begun at the dock.');return true;
+    if(!p||(p.boats?.length??0)>=5||this.state.wood<6)return false;
+    this.state.wood-=6;(p.boats??=[]).push({state:'building',progress:0,returnAt:0,departAt:0,trips:0,fish:0});this.event(`Boat ${(p.boats?.length??0)} of 5 has joined the dock's build queue.`);return true;
   }
   private deliveryPoint(w:Settler,id:number):Point|null{
     if(id===0)return (w.cargo.boatFish??0)>0?null:this.state.camp;
@@ -248,18 +250,19 @@ export class Settlement {
     for(const [dx,dz] of [[4,0],[-4,0],[0,4],[0,-4]])if(!this.nav.segment(p,{x:p.x+dx,z:p.z+dz}))return result(false,'Choose a wider clearing with room around your camp.');
     return result(true,'Settle here · Two followers will make this their home');
   }
-  add(count=2,chosen?:Point){
+  add(count=2,chosen?:Point,provision=true){
     if(!this.state.camp){
       const start=chosen?{x:chosen.x,z:chosen.z}:this.nav.nearest({x:-5,z:3},45);if(!start){this.event('There is no safe dry ground yet. Raise a terrace for your settlers.');return 0;}
       this.state.camp=start;this.seedResources();this.discover();
     }
     const camp=this.state.camp;
-    const added=Math.min(Math.max(0,Math.floor(count)),30-this.state.settlers.length);
+    const room=this.state.settlers.length<2?2-this.state.settlers.length:Math.max(0,Math.min(V.maxPopulation,this.capacity)-this.state.settlers.length);
+    const added=Math.min(Math.max(0,Math.floor(count)),room);
     for(let k=0;k<added;k++){
       const i=this.state.settlers.length,p=this.nav.nearest({x:camp.x+(i%3-1)*.45,z:camp.z+(Math.floor(i/3)%3-1)*.45},2)??camp;
       this.state.settlers.push({...p,id:this.id(),name:NAMES[i%NAMES.length]+(i>=10?` ${Math.floor(i/10)+1}`:''),heading:0,moving:false,stranded:false,job:null,cargo:{wood:0,food:0,harvest:0}});
     }
-    if(added){this.state.food+=this.state.settlers.length>2?added*6:0;this.event(`${added} settlers arrived. They will choose their own work.`);}
+    if(added){this.state.food+=provision&&this.state.settlers.length>2?added*6:0;this.event(`${added} settlers arrived. They will choose their own work.`);}
     return this.state.settlers.length;
   }
   private seedResources(){
@@ -322,7 +325,7 @@ export class Settlement {
     this.state.plots.push({x:p.x,z:p.z,id:guidedId??this.id(),kind,guided:guidedId!==undefined,stage:'building',progress:0,valid:true,claimedBy:null,supplied:0,pendingWood:BUILD_COST[kind],
       moisture:.68,fertility:f.fertilityEstimate,crop:0,planted:false,harvests:0,
       ...((kind==='coop'||kind==='pigpen')?{stock:0,breed:0,fed:false,priority:'breed' as const,keeperId:null}:{}),
-      ...(kind==='temple'?{offerings:0}:kind==='slaughterhouse'?{livestock:0,rearing:false,rearingProgress:0,processed:0}:kind==='dock'?{boatState:'none' as const,boatProgress:0,boatTrips:0,boatFish:0}:{})});
+      ...(kind==='temple'?{offerings:0}:kind==='slaughterhouse'?{livestock:0,rearing:false,rearingProgress:0,processed:0}:kind==='dock'?{boats:[],boatState:'none' as const,boatProgress:0,boatTrips:0,boatFish:0}:{})});
     this.nav.invalidate();this.needDiscovery=true;
     // A new home is an obstacle. Replan existing journeys before moving again.
     for(const w of this.state.settlers)if(w.job){
@@ -356,7 +359,9 @@ export class Settlement {
     if(w.cargo.construction){const p=this.state.plots.find(p=>p.id===w.cargo.construction!.site);if(p&&p.valid&&p.claimedBy===null)this.assign(w,'supply',p.id,workPoint(p));return;}
     if(w.cargo.animal){this.foodSystem.decide(w);return;}
     if(w.cargo.wood+w.cargo.food>0){this.deliver(w);return;}
-    if(this.state.plots.some(p=>p.kind==='granary'&&p.valid&&p.stage==='complete'))for(const p of this.state.plots.filter(p=>p.kind==='dock'&&p.valid&&p.stage==='complete'&&p.boatState==='docked'&&(p.boatFish??0)>0))if(this.assign(w,'unload-boat',p.id,workPoint(p)))return;
+    if(this.state.plots.some(p=>p.kind==='granary'&&p.valid&&p.stage==='complete'))for(const p of this.state.plots.filter(p=>p.kind==='dock'&&p.valid&&p.stage==='complete'&&(p.boats??[]).some(b=>b.state==='docked'&&b.fish>0))){
+      const reserved=new Set(this.state.settlers.filter(a=>a.job?.kind==='unload-boat'&&a.job.target===p.id).map(a=>a.job!.destination)),index=(p.boats??[]).findIndex((b,i)=>b.state==='docked'&&b.fish>0&&!reserved.has(i)),route=index<0?null:this.nav.route(w,workPoint(p));if(route){w.job={kind:'unload-boat',target:p.id,route,work:0,destination:index};return;}
+    }
     const hungry=this.state.food<this.state.settlers.length*3;
     if(hungry&&this.resourceJob(w,'forage'))return;
     const clearing=this.state.orders.find(o=>this.insideSite(w,o)&&this.state.wood>=BUILD_COST[o.kind]);
@@ -367,7 +372,7 @@ export class Settlement {
     const fields=plots.filter(p=>{const farmer=this.state.settlers.find(a=>a.id===p.farmerId);return !farmer||farmer.id===w.id||farmer.stranded||!this.nav.route(farmer,workPoint(p));});
     const ready=fields.filter(p=>p.kind==='farm'&&p.stage==='complete'&&p.planted&&p.crop>=1);
     for(const p of ready)if(this.assign(w,'harvest',p.id,workPoint(p)))return;
-    for(const p of plots.filter(p=>p.stage==='building'||p.upgrading||(p.kind==='dock'&&p.boatState==='building'))){
+    for(const p of plots.filter(p=>p.stage==='building'||p.upgrading||(p.kind==='dock'&&(p.boats??[]).some(b=>b.state==='building')))){
       if((p.supplied??constructionCost(p))>=constructionCost(p)){if(this.assign(w,'build',p.id,workPoint(p)))return;}
       else if((p.pendingWood??0)>0&&this.state.camp&&this.nav.route(this.state.camp,workPoint(p))&&this.assign(w,'supply',p.id,this.state.camp))return;
     }
@@ -432,13 +437,13 @@ export class Settlement {
       this.release(w);return;
     }
     const p=this.state.plots.find(p=>p.id===job.target);
-    if(!p||!p.valid||p.claimedBy!==w.id){this.release(w);return;}
     if(job.kind==='unload-boat'){
-      if(p.kind!=='dock'||p.boatState!=='docked'||(p.boatFish??0)<=0){this.release(w);return;}
-      const amount=Math.min(10,p.boatFish??0);p.boatFish=(p.boatFish??0)-amount;w.cargo.food+=amount;w.cargo.boatFish=(w.cargo.boatFish??0)+amount;
-      if(p.boatFish<=0)this.sendBoat(p);
+      const boat=p?.boats?.[job.destination??-1];if(p?.kind!=='dock'||!boat||boat.state!=='docked'||boat.fish<=0){this.release(w);return;}
+      const amount=Math.min(10,boat.fish);boat.fish-=amount;w.cargo.food+=amount;w.cargo.boatFish=(w.cargo.boatFish??0)+amount;
+      if(boat.fish<=0)this.sendBoat(p,boat);
       this.release(w);return;
     }
+    if(!p||!p.valid||p.claimedBy!==w.id){this.release(w);return;}
     if(job.kind==='supply'){
       if(w.cargo.construction){
         if(w.cargo.construction.site!==p.id||distance(w,workPoint(p))>.2){this.release(w);return;}
@@ -452,14 +457,15 @@ export class Settlement {
       return;
     }
     if(job.kind==='build'){
-      if(p.kind==='dock'&&p.stage==='complete'&&p.boatState==='building'){
-        w.heading=Math.atan2(p.x-w.x,p.z-w.z);p.boatProgress=Math.min(1,(p.boatProgress??0)+dt/22);
-        if(p.boatProgress>=1){p.boatFish=0;this.sendBoat(p);this.release(w);}
+      const buildingBoat=p.boats?.find(b=>b.state==='building');
+      if(p.kind==='dock'&&p.stage==='complete'&&buildingBoat){
+        w.heading=Math.atan2(p.x-w.x,p.z-w.z);buildingBoat.progress=Math.min(1,buildingBoat.progress+dt/22);
+        if(buildingBoat.progress>=1){buildingBoat.fish=0;this.sendBoat(p,buildingBoat);this.release(w);}
         return;
       }
       if((p.supplied??constructionCost(p))<constructionCost(p)){this.release(w);return;}
       w.heading=Math.atan2(p.x-w.x,p.z-w.z);
-      if(p.upgrading){p.upgradeProgress=Math.min(1,(p.upgradeProgress??0)+dt/V.cottageSeconds);if(p.upgradeProgress>=1){p.level=2;p.upgrading=false;delete p.supplied;delete p.pendingWood;this.release(w);this.event('A cottage is ready. Six followers can shelter here.');}return;}
+      if(p.upgrading){p.upgradeProgress=Math.min(1,(p.upgradeProgress??0)+dt/V.cottageSeconds);if(p.upgradeProgress>=1){p.level=2;p.upgrading=false;delete p.supplied;delete p.pendingWood;this.release(w);this.event('A cottage is ready. Seven followers can shelter here.');}return;}
       p.progress=Math.min(1,p.progress+dt/BUILD_TIME[p.kind]);
       if(p.progress>=1){p.stage='complete';delete p.supplied;delete p.pendingWood;if(p.kind==='slaughterhouse')p.livestock=2;if(p.kind==='farm'&&!p.farmerId)p.farmerId=this.state.settlers.find(a=>!this.state.plots.some(f=>f.farmerId===a.id))?.id??null;this.release(w);this.event(p.kind==='dock'?'The dock is ready. Build a fishing boat from its building card.':p.kind==='torch'?'Your tiki torch is ready. It lights after dusk.':p.kind==='bonfire'?'Your bonfire is ready for evening gatherings.':p.kind==='home'?'A home is ready. Four settlers can shelter here.':p.kind==='farm'?'A field is ready for planting.':p.kind==='temple'?'The temple is ready. Cared-for followers will bring offerings.':p.kind==='coop'?'The chicken coop is ready. Assign a keeper to herd chickens to the coop.':p.kind==='pigpen'?'The pig pen is ready. Train a hunter and place traps.':p.kind==='granary'?'The granary is ready. Followers can deliver food here.':p.kind==='storehouse'?'The storehouse is ready. Followers can deliver wood here.':'The slaughterhouse is ready, with a breeding pair of goats.');}
     }else if(job.kind==='worship'&&job.work>=4){
@@ -554,11 +560,11 @@ export class Settlement {
       if(n.regrowth>=45){n.regrowth-=45;n.stock=Math.min(n.capacity,n.stock+1);}
     }
     for(const school of s.fishSchools)if(school.visits>=10&&s.time>=school.regenAt){school.visits=0;school.regenAt=0;}
-    for(const p of s.plots)if(p.kind==='dock'&&p.valid&&p.stage==='complete'){
-      if(p.boatState==='at-sea'&&s.time>=(p.boatReturnAt??Infinity)){
-        const school=s.fishSchools.find(a=>a.id===p.boatSchoolId);if(school){school.visits++;if(school.visits>=10)school.regenAt=s.time+3600;}
-        p.boatFish=20;p.boatTrips=(p.boatTrips??0)+1;p.boatState='docked';
-        this.event('The fishing boat returned with 20 fish. Villagers will carry them to a granary.');
+    for(const p of s.plots)if(p.kind==='dock'&&p.valid&&p.stage==='complete')for(const boat of p.boats??[]){
+      if(boat.state==='at-sea'&&s.time>=boat.returnAt){
+        const school=s.fishSchools.find(a=>a.id===boat.schoolId);if(school){school.visits=Math.min(10,school.visits+1);if(school.visits>=10&&!school.regenAt)school.regenAt=s.time+3600;}
+        boat.fish=20;boat.trips++;boat.state='docked';
+        this.event('A fishing boat joined the dock queue with 20 fish. Villagers will carry them to a granary.');
       }
     }
     for(const p of s.plots)if(p.kind==='farm'&&p.valid){
@@ -579,11 +585,12 @@ export class Settlement {
       const farms=s.plots.filter(p=>p.kind==='farm'&&p.valid).length;
       const guided=s.orders.length>0;this.processOrders();
       if(!guided){
-        if(homes<Math.ceil(s.settlers.length/4))this.reserve('home');
-        else if(farms<Math.ceil(s.settlers.length/4))this.reserve('farm');
+        if(homes<Math.min(20,Math.floor(s.settlers.length/V.hutCapacity)+1))this.reserve('home');
+        else if(farms<Math.ceil(s.settlers.length/V.hutCapacity))this.reserve('farm');
       }
       for(const w of s.settlers)this.decide(w);
     }
+    if(s.tick%2400===1&&s.settlers.length<Math.min(V.maxPopulation,this.capacity)&&s.food>=s.settlers.length*5+6)this.add(1,undefined,false);
     for(const w of s.settlers){w.moving=false;if(w.job?.kind==='gather'&&(!evening(s.time)||s.food<s.settlers.length*3||s.orders.length>0||!s.plots.some(p=>p.id===w.job!.target&&p.valid&&p.stage==='complete')))this.release(w);if(w.stranded)continue;this.foodSystem.beforeWalk(w);this.walk(w,dt);this.work(w,dt);}
     this.prayers(dt);
   }
@@ -605,11 +612,11 @@ export class Settlement {
       const offset=completedHomes.slice(0,completedHomes.indexOf(p)).reduce((n,h)=>n+homeCapacity(h),0);
       const residents=p.kind==='home'&&p.valid&&p.stage==='complete'?s.settlers.slice(offset,offset+homeCapacity(p)):[];
       const worker=s.settlers.find(w=>w.id===p.claimedBy);
-      return {occupants:p.kind==='torch'?'Warm firelight at night':p.kind==='bonfire'?`${s.settlers.filter(w=>w.job?.kind==='gather'&&w.job.target===p.id).length}/6 gathering`:p.kind==='home'?`${residents.length}/${homeCapacity(p)} residents · ${residents.map(w=>w.name).join(', ')||'Room for new followers'}`:null,name:p.kind==='home'&&p.level===2?'Cottage':BUILD_LABEL[p.kind],upgrade:p.kind==='home'&&p.stage==='complete'&&p.level!==2?{allowed:!p.upgrading&&p.valid&&s.wood>=V.cottageWood&&!!s.camp&&!!this.nav.route(s.camp,workPoint(p)),message:p.upgrading?'Cottage upgrade in progress':`Upgrade to cottage · ${V.cottageWood} wood · 6 residents${s.wood<V.cottageWood?' · Gather more wood':!p.valid||!s.camp||!this.nav.route(s.camp,workPoint(p))?' · Restore a safe path':''}`}:null,workers:worker?`${worker.name} · ${worker.job?labels[worker.job.kind]:'Resting'}`:'No worker at this building',id:p.id,kind:p.kind,farmerId:p.farmerId??null,message:p.stage==='building'||p.upgrading||!p.valid?this.buildingMessage(p):p.kind==='torch'?'Warm firelight at night':p.kind==='bonfire'?`${s.settlers.filter(w=>w.job?.kind==='gather'&&w.job.target===p.id).length}/6 gathering`:p.kind==='home'?`${residents.length}/${homeCapacity(p)} sheltered`:p.kind==='granary'?`${Math.floor(s.food)}/${this.storage.food} food in shared village storage`:p.kind==='storehouse'?`${Math.floor(s.wood)}/${this.storage.wood} wood in shared village storage`:p.kind==='temple'?`${p.offerings??0} faith awaiting collection`:p.kind==='coop'||p.kind==='pigpen'?`${p.stock??0} ${p.kind==='coop'?'chickens':'pigs'}`:p.kind==='slaughterhouse'?`${p.livestock??0} goats · ${p.rearing?'Rearing livestock':'Needs surplus food to rear goats'}`:!p.planted?'Waiting for planting':p.crop>=1?'Ready to harvest':p.moisture<=.08?'Crops need rain':`Growing · ${Math.round(p.crop*100)}%`,
+      return {occupants:p.kind==='torch'?'Warm firelight at night':p.kind==='bonfire'?`${s.settlers.filter(w=>w.job?.kind==='gather'&&w.job.target===p.id).length}/6 gathering`:p.kind==='home'?`${residents.length}/${homeCapacity(p)} residents · ${residents.map(w=>w.name).join(', ')||'Room for new followers'}`:null,name:p.kind==='home'&&p.level===2?'Cottage':BUILD_LABEL[p.kind],upgrade:p.kind==='home'&&p.stage==='complete'&&p.level!==2?{allowed:!p.upgrading&&p.valid&&s.wood>=V.cottageWood&&!!s.camp&&!!this.nav.route(s.camp,workPoint(p)),message:p.upgrading?'Cottage upgrade in progress':`Upgrade to cottage · ${V.cottageWood} wood · 7 residents${s.wood<V.cottageWood?' · Gather more wood':!p.valid||!s.camp||!this.nav.route(s.camp,workPoint(p))?' · Restore a safe path':''}`}:null,workers:worker?`${worker.name} · ${worker.job?labels[worker.job.kind]:'Resting'}`:'No worker at this building',id:p.id,kind:p.kind,farmerId:p.farmerId??null,message:p.stage==='building'||p.upgrading||!p.valid?this.buildingMessage(p):p.kind==='torch'?'Warm firelight at night':p.kind==='bonfire'?`${s.settlers.filter(w=>w.job?.kind==='gather'&&w.job.target===p.id).length}/6 gathering`:p.kind==='home'?`${residents.length}/${homeCapacity(p)} sheltered`:p.kind==='granary'?`${Math.floor(s.food)}/${this.storage.food} food in shared village storage`:p.kind==='storehouse'?`${Math.floor(s.wood)}/${this.storage.wood} wood in shared village storage`:p.kind==='temple'?`${p.offerings??0} faith awaiting collection`:p.kind==='coop'||p.kind==='pigpen'?`${p.stock??0} ${p.kind==='coop'?'chickens':'pigs'}`:p.kind==='slaughterhouse'?`${p.livestock??0} goats · ${p.rearing?'Rearing livestock':'Needs surplus food to rear goats'}`:!p.planted?'Waiting for planting':p.crop>=1?'Ready to harvest':p.moisture<=.08?'Crops need rain':`Growing · ${Math.round(p.crop*100)}%`,
         detail:p.stage==='building'||p.upgrading?`${p.supplied??constructionCost(p)}/${constructionCost(p)} wood supplied · ${worker?worker.name:'No builder assigned'}`:p.kind==='torch'?'Lights automatically after dusk':p.kind==='bonfire'?'Up to 6 available followers gather here in the evening':p.kind==='home'?(residents.map(w=>w.name).join(', ')||'Room for new followers'):p.kind==='granary'||p.kind==='storehouse'?`Adds ${p.kind==='granary'?V.granaryFood+' food':V.storehouseWood+' wood'} capacity · Deliveries enter shared storage here`:p.kind==='temple'?(worker?`${worker.name} is visiting`:'Followers visit between duties when housed and fed'):p.kind==='coop'||p.kind==='pigpen'?'Manage keepers and breeding in Food & wildlife':p.kind==='slaughterhouse'?`${p.poultry??0} chickens + ${p.pork??0} pigs awaiting processing · Breeding pair protected · 4 feed → 10 food · ${p.processed??0} batches prepared`:`${p.farmerId?(s.settlers.find(w=>w.id===p.farmerId)?.name??'Farmer')+' tends this field · ':worker?worker.name+' · ':''}Water ${Math.round(p.moisture*100)}% · ${p.harvests} harvests`,
         progress:p.upgrading?p.upgradeProgress??0:p.stage==='building'?p.progress:p.kind==='farm'&&p.planted?p.crop:p.kind==='slaughterhouse'&&p.rearing?p.rearingProgress??0:null};
     });
-    const dockPlot=s.plots.find(p=>p.kind==='dock'&&p.valid&&p.stage==='complete'),hasStore=s.plots.some(p=>p.kind==='granary'&&p.valid&&p.stage==='complete'),dock=dockPlot?{id:dockPlot.id,state:dockPlot.boatState??'none',progress:dockPlot.boatProgress??0,trips:dockPlot.boatTrips??0,fish:dockPlot.boatFish??0,hasStore,canBuild:dockPlot.boatState==='none'&&s.wood>=6}:null;
+    const dockPlot=s.plots.find(p=>p.kind==='dock'&&p.valid&&p.stage==='complete'),hasStore=s.plots.some(p=>p.kind==='granary'&&p.valid&&p.stage==='complete'),boats=dockPlot?.boats??[],building=boats.find(b=>b.state==='building'),dock=dockPlot?{id:dockPlot.id,state:building?'building' as const:boats.some(b=>b.state==='docked')?'docked' as const:boats.some(b=>b.state==='at-sea')?'at-sea' as const:'none' as const,progress:building?.progress??0,trips:boats.reduce((n,b)=>n+b.trips,0),fish:boats.reduce((n,b)=>n+b.fish,0),ships:boats.length,atSea:boats.filter(b=>b.state==='at-sea').length,queued:boats.filter(b=>b.state==='docked').length,hasStore,canBuild:boats.length<5&&s.wood>=6}:null;
     const beacon=s.beacon?{id:s.beacon.id,remaining:Math.ceil(s.beacon.expires-s.time),message:`${s.beacon.members.filter(m=>m.phase==='arrived'||m.phase==='done').length}/${s.beacon.members.length} gathered · ${s.beacon.members.some(m=>m.phase==='waiting')?'Some need a route: sculpt single-layer steps':'Following your light'}`} : null;
     return {dock,storage:this.storage,foodSystem:this.foodSystem.status(),tier:s.tier,milestone:s.tier===2?'Tier 2 · Wider temple influence and blessings':`Tier 2: ${Math.min(2,homes)}/2 huts · ${s.harvestedFood>0?'1':'0'}/1 harvest delivered · ${s.plots.some(p=>p.kind==='temple'&&p.valid&&p.stage==='complete')?'1':'0'}/1 temple`,offerings:s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').reduce((n,p)=>n+(p.offerings??0),0),temples:s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').length,slaughterhouses:s.plots.filter(p=>p.kind==='slaughterhouse'&&p.valid&&p.stage==='complete').length,beacon,buildings,faithMessage:this.capacity<s.settlers.length?'Build shelter for everyone to earn steady faith.':s.food<=s.settlers.length*3?'Store more food to earn steady faith.':s.faith>=500?'Faith is full. Use a blessing to help your village.':`Your cared-for village earns ${(s.settlers.length*.008*60).toFixed(1)} faith per minute.`,population:s.settlers.length,sheltered:Math.min(this.capacity,s.settlers.length),homes,farms,
       food:Math.floor(s.food),wood:Math.floor(s.wood),faith:Math.floor(s.faith),day:Math.floor(s.time/DAY_SECONDS)+1,timeOfDay:timeOfDay(s.time),

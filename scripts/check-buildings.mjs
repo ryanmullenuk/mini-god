@@ -24,14 +24,19 @@ function materialTotal(sim,p){return (p.pendingWood??0)+(p.supplied??0)+sim.stat
 test('cottage upgrade keeps shelter and requires physical deliveries before hammering',()=>{
  const {terrain,sim}=setup();try{
   const p=plot(sim,'home');sim.state.wood=V.cottageWood;
-  assert.equal(sim.upgradeHome(p.id),true);assert.equal(sim.upgradeHome(p.id),false);assert.equal(sim.state.wood,0);assert.equal(sim.capacity,4);
+  assert.equal(sim.upgradeHome(p.id),true);assert.equal(sim.upgradeHome(p.id),false);assert.equal(sim.state.wood,0);assert.equal(sim.capacity,5);
   run(sim,2);assert.equal(p.upgradeProgress,0);assert.equal(materialTotal(sim,p),12);
-  let carried=false;for(let n=0;n<2200&&p.level!==2;n++){sim.advance(.1);carried ||= sim.state.settlers.some(w=>w.cargo.construction);if(p.upgrading){assert.equal(sim.capacity,4);assert.equal(materialTotal(sim,p),12);if(p.supplied<12)assert.equal(p.upgradeProgress,0);}}
-  assert.ok(carried);assert.equal(p.level,2);assert.equal(sim.capacity,6);assert.equal(sim.state.deliveredWood,0);assert.equal(sim.status().buildings[0].name,'Cottage');
+  let carried=false;for(let n=0;n<2200&&p.level!==2;n++){sim.advance(.1);carried ||= sim.state.settlers.some(w=>w.cargo.construction);if(p.upgrading){assert.equal(sim.capacity,5);assert.equal(materialTotal(sim,p),12);if(p.supplied<12)assert.equal(p.upgradeProgress,0);}}
+  assert.ok(carried);assert.equal(p.level,2);assert.equal(sim.capacity,7);assert.equal(sim.state.deliveredWood,0);assert.equal(sim.status().buildings[0].name,'Cottage');
  }finally{terrain.dispose();}
 });
 test('upgrades reject missing wood and unsafe camp access without charging',()=>{
  const {terrain,sim}=setup();try{const p=plot(sim,'home');assert.equal(sim.upgradeHome(p.id),false);sim.state.wood=12;const route=sim.nav.route;sim.nav.route=()=>null;assert.equal(sim.upgradeHome(p.id),false);assert.equal(sim.state.wood,12);assert.equal(p.upgrading,undefined);sim.nav.route=route;}finally{terrain.dispose();}
+});
+test('five residents fit each hut and village population caps at one hundred',()=>{
+ const {terrain,sim}=setup();try{
+  for(let i=0;i<20;i++)plot(sim,'home',i*3,3);assert.equal(sim.capacity,100);sim.add(200);assert.equal(sim.state.settlers.length,100);assert.equal(sim.add(1),100);
+ }finally{terrain.dispose();}
 });
 test('granary and storehouse are constructed by delivered materials, then add capacity',()=>{
  for(const kind of ['granary','storehouse']){const {terrain,sim}=setup();try{

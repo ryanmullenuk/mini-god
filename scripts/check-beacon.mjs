@@ -91,7 +91,7 @@ test('hut residents, field conditions and faith feedback reflect the actual vill
   const {terrain,sim}=flat();try{
     sim.state.wood=9;sim.guide('home',{x:1,z:3});sim.guide('farm',{x:5,z:3});run(sim,180);
     const status=sim.status();assert.equal(status.homes,1);assert.equal(status.farms,1);
-    assert.ok(status.buildings.some(b=>b.kind==='home'&&b.message==='2/4 sheltered'&&b.detail.includes('Aro')));
+    assert.ok(status.buildings.some(b=>b.kind==='home'&&b.message==='2/5 sheltered'&&b.detail.includes('Aro')));
     assert.ok(status.buildings.some(b=>b.kind==='farm'&&b.detail.includes('Water')));
     assert.match(status.faithMessage,/faith per minute/);
   }finally{terrain.dispose();}

@@ -22,7 +22,7 @@ export class SettlementView {
   private dummy=new THREE.Object3D();
   private materialCache=new Map<string,THREE.MeshLambertMaterial>();
   private opportunityKey='';
-  private fireLights=Array.from({length:4},()=>new THREE.PointLight('#ffae51',0,7,2));
+  private fireLights=Array.from({length:12},()=>new THREE.PointLight('#ffae51',0,14,1.65));
   constructor(private terrain:Terrain){
     this.group.add(...this.fireLights);
     this.group.add(this.camp,this.opportunities,this.beacon,this.influence);
@@ -68,10 +68,10 @@ export class SettlementView {
       }
       const fire=new THREE.Group();fire.name='fire';fire.position.y=base;building.add(fire);
       for(let i=0;i<3;i++){
-        const flame=new THREE.Mesh(new THREE.ConeGeometry((torch?.1:.22)*(1-i*.22),(torch?.35:.6)*(1-i*.2),5),new THREE.MeshBasicMaterial({color:['#ff702e','#ffba4f','#fff2ac'][i],toneMapped:false}));
+        const flame=new THREE.Mesh(new THREE.ConeGeometry((torch?.14:.31)*(1-i*.22),(torch?.50:.88)*(1-i*.2),5),new THREE.MeshBasicMaterial({color:['#ff702e','#ffba4f','#fff2ac'][i],toneMapped:false}));
         flame.position.set((i-1)*.035,.15+i*.02,0);fire.add(flame);
       }
-      const halo=new THREE.Mesh(new THREE.CircleGeometry(torch?.65:1.35,24),new THREE.MeshBasicMaterial({color:'#ffb951',transparent:true,opacity:.12,depthWrite:false,toneMapped:false}));
+      const halo=new THREE.Mesh(new THREE.CircleGeometry(torch?1.15:2.35,24),new THREE.MeshBasicMaterial({color:'#ffb951',transparent:true,opacity:.16,depthWrite:false,toneMapped:false}));
       halo.name='fire-halo';halo.rotation.x=-Math.PI/2;halo.position.y=.035;building.add(halo);
     }else if(p.kind==='dock'){
       for(let i=0;i<7;i++)this.box(building,1.65,.11,.28,i%2?'#9a7046':'#ae8354',0,.18,.25+i*.31);
@@ -87,6 +87,7 @@ export class SettlementView {
       for(const [r,y] of [[.30,1.72],[.22,1.71],[.13,1.70]] as const){const mark=this.mesh(boat,new THREE.TorusGeometry(r,.035,5,18),'#c66f3c',.40,y,2.415);mark.scale.y=.72;}
       this.box(boat,.52,.26,.42,'#76502f',.13,.66,2.72);
       for(let i=0;i<5;i++){const fish=this.mesh(boat,new THREE.IcosahedronGeometry(.055,0),'#a6b8b5',-.18+i*.09,.84,2.72);fish.scale.z=1.8;}
+      const model=new THREE.Group();while(boat.children.length)model.add(boat.children[0]);boat.add(model);for(let i=1;i<5;i++)boat.add(model.clone(true));
     }else if(p.kind==='home'){building.scale.setScalar(B.visuals.hut);
       this.box(building,1.85,.11,1.85,'#d7c8a5',0,.04,0);
       this.box(building,1.62,1.18,1.52,'#f1ead7',0,.67,-.08);
@@ -262,25 +263,28 @@ export class SettlementView {
       v.building.scale.y=p.kind==='home'?B.visuals.hut:!complete?.15+p.progress*.85:1;
       if(p.kind==='dock'){
         let best={x:0,z:1,h:Infinity};for(let i=0;i<16;i++){const a=i*Math.PI/8,x=Math.sin(a)*3,z=Math.cos(a)*3,h=this.terrain.height(p.x+x,p.z+z);if(h<best.h)best={x,z,h};}
-        v.root.rotation.y=Math.atan2(best.x,best.z);v.boat.visible=complete&&p.boatState!=='none';
-        if(p.boatState==='building'){v.boat.position.z=0;v.boat.scale.setScalar(.18+.82*(p.boatProgress??0));}
-        else{
-          v.boat.scale.setScalar(1);let x=0,z=0;
-          if(p.boatState==='at-sea'&&p.boatTargetX!==undefined&&p.boatTargetZ!==undefined){
-            const duration=Math.max(.001,(p.boatReturnAt??s.time)-(p.boatDepartAt??s.time)),phase=THREE.MathUtils.clamp((s.time-(p.boatDepartAt??s.time))/duration,0,1),travel=Math.sin(Math.PI*phase),dx=p.boatTargetX-p.x,dz=p.boatTargetZ-p.z,theta=v.root.rotation.y;
+        v.root.rotation.y=Math.atan2(best.x,best.z);v.boat.visible=complete;
+        const boats=p.boats??[],docked=boats.map((b,i)=>({b,i})).filter(({b})=>b.state==='docked');
+        v.boat.children.forEach((model,i)=>{
+          const boat=boats[i];model.visible=!!boat;if(!boat)return;
+          model.scale.setScalar(boat.state==='building'?.18+.82*boat.progress:1);let x=0,z=0;
+          if(boat.state==='at-sea'&&boat.targetX!==undefined&&boat.targetZ!==undefined){
+            const duration=Math.max(.001,boat.returnAt-boat.departAt),phase=THREE.MathUtils.clamp((s.time-boat.departAt)/duration,0,1),travel=Math.sin(Math.PI*phase),dx=boat.targetX-p.x,dz=boat.targetZ-p.z,theta=v.root.rotation.y;
             x=(Math.cos(theta)*dx-Math.sin(theta)*dz)*travel;z=(Math.sin(theta)*dx+Math.cos(theta)*dz)*travel;
-          }
-          v.boat.position.x=x;v.boat.position.z=z;v.boat.position.y=Math.sin(s.time*2.2)*.05;
-        }
+          }else if(boat.state==='docked'){
+            const queue=docked.findIndex(entry=>entry.i===i);x=(queue-(docked.length-1)/2)*1.55;z=1.0+queue*.3;
+          }else{x=(i%2)*1.4-.7;z=Math.floor(i/2)*.45;}
+          model.position.set(x,Math.sin(s.time*2.2+i)*.05,z);
+        });
       }
       if(p.kind==='torch'||p.kind==='bonfire'){
         const fire=v.building.getObjectByName('fire')!,halo=v.building.getObjectByName('fire-halo')!;
         fire.visible=halo.visible=p.valid&&complete&&fireStrength>.01;
         const flicker=1+Math.sin(s.time*5.3+p.id)*.08+Math.sin(s.time*8.1+p.id*2)*.04;
-        fire.scale.set(1,flicker,1);
+        fire.scale.set(.96+Math.sin(s.time*7.1+p.id)*.07,flicker,1);
         if(fire.visible&&lightIndex<this.fireLights.length){
           const light=this.fireLights[lightIndex++];light.position.set(p.x,height+(p.kind==='torch'?1.2:.7),p.z);
-          light.intensity=fireStrength*flicker*(p.kind==='torch'?2:4);
+          light.distance=p.kind==='torch'?12:18;light.intensity=fireStrength*flicker*(p.kind==='torch'?4.5:8.5);
         }
       }
       v.animals.visible=p.valid&&complete;v.animals.children.forEach((animal,i)=>{

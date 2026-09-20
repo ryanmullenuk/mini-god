@@ -67,15 +67,15 @@ test('boats fish deep-water schools and villagers unload the catch into a granar
     let shore=null;for(let z=-95;z<=95&&!shore;z+=2)for(let x=-95;x<=95;x+=2){const preview=sim.guidancePreview('dock',{x,z});if(preview.allowed){shore={x,z};break;}}
     assert.ok(shore,'Expected reachable shoreline for a dock');assert.ok(sim.guide('dock',shore).allowed);
     for(let i=0;i<9000&&!sim.state.plots.some(p=>p.kind==='dock'&&p.stage==='complete');i++)sim.advance(.1);
-    const dock=sim.state.plots.find(p=>p.kind==='dock');assert.equal(dock?.stage,'complete',JSON.stringify({dock,workers:sim.state.settlers.map(w=>w.job)}));assert.equal(dock.boatState,'none');
-    assert.ok(sim.buildBoat(dock.id));run(sim,25);assert.equal(dock.boatState,'at-sea');assert.ok(dock.boatSchoolId);const before=sim.state.deliveredFood;
-    run(sim,61);assert.equal(dock.boatState,'docked');assert.equal(dock.boatTrips,1);assert.equal(dock.boatFish,20);run(sim,10);assert.equal(dock.boatFish,20,'A catch waits when no granary exists');
+    const dock=sim.state.plots.find(p=>p.kind==='dock');assert.equal(dock?.stage,'complete',JSON.stringify({dock,workers:sim.state.settlers.map(w=>w.job)}));assert.deepEqual(dock.boats,[]);
+    for(let i=0;i<5;i++)assert.ok(sim.buildBoat(dock.id));assert.equal(sim.buildBoat(dock.id),false);run(sim,25);assert.equal(dock.boats[0].state,'at-sea');assert.ok(dock.boats[0].schoolId);const before=sim.state.deliveredFood;
+    run(sim,61);assert.ok(dock.boats.some(b=>b.state==='docked'));assert.ok(dock.boats.some(b=>b.trips===1));assert.ok(dock.boats.reduce((n,b)=>n+b.fish,0)>=20);run(sim,10);assert.ok(dock.boats.reduce((n,b)=>n+b.fish,0)>=20,'Catches queue when no granary exists');
     let store=null;for(let z=-90;z<=90&&!store;z+=2)for(let x=-90;x<=90;x+=2){const preview=sim.guidancePreview('granary',{x,z});if(preview.allowed){store={x,z};break;}}
     assert.ok(store);assert.ok(sim.guide('granary',store).allowed);for(let i=0;i<5000&&!sim.state.plots.some(p=>p.kind==='granary'&&p.stage==='complete');i++)sim.advance(.1);
-    for(let i=0;i<550&&sim.state.deliveredFood<before+20;i++)sim.advance(.1);assert.equal(dock.boatFish,0);assert.ok(sim.state.deliveredFood>=before+20);assert.equal(dock.boatState,'at-sea');
-    const visited=sim.state.fishSchools.find(s=>s.id===dock.boatSchoolId);assert.ok(visited&&visited.visits>=1);
-    const regenerating=sim.state.fishSchools.find(s=>s.id!==dock.boatSchoolId);assert.ok(regenerating);regenerating.visits=10;regenerating.regenAt=sim.state.time+.2;run(sim,.3);assert.equal(regenerating.visits,0);
-    const restored=decodeSave(encodeSave(terrain.values,sim.state,terrain.revision));assert.equal(restored.world.plots.find(p=>p.kind==='dock').boatTrips,1);
+    for(let i=0;i<3000&&sim.state.deliveredFood<before+20;i++)sim.advance(.1);assert.ok(sim.state.deliveredFood>=before+20);
+    const visited=sim.state.fishSchools.find(s=>s.visits>=1);assert.ok(visited);
+    const regenerating=sim.state.fishSchools.find(s=>s.id!==visited.id);assert.ok(regenerating);regenerating.visits=10;regenerating.regenAt=sim.state.time+.2;run(sim,.3);assert.equal(regenerating.visits,0);
+    const restored=decodeSave(encodeSave(terrain.values,sim.state,terrain.revision));assert.equal(restored.world.plots.find(p=>p.kind==='dock').boats.length,5);
   }finally{terrain.dispose();}
 });
 
@@ -183,7 +183,7 @@ test('fire buildings use supplied construction and survive saves',()=>{
     const restored=decodeSave(encodeSave(terrain.values,sim.state));
     assert.equal(restored.world.plots.filter(p=>['torch','bonfire'].includes(p.kind)).length,2);
     const view=new SettlementView(terrain);view.update(sim,false,false);
-    assert.equal(view.group.children.filter(x=>x.isPointLight).length,4);
+    assert.equal(view.group.children.filter(x=>x.isPointLight).length,12);
     view.dispose();
   }finally{terrain.dispose();}
 });
