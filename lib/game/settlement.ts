@@ -103,7 +103,7 @@ export class Settlement {
     if(home)homes.push(home);
     return new Navigation(this.terrain,(x,z)=>homes.some(p=>Math.abs(x-p.x)<1.32&&Math.abs(z-p.z)<1.32));
   }
-  guidancePreview(kind:GuidanceKind,point:Point,ignoreOrder?:number):GuidancePreview{
+  guidancePreview(kind:GuidanceKind,point:Point&{rotation?:number},ignoreOrder?:number):GuidancePreview{
     if(kind==='fishing'||kind==='trap')return this.foodSystem.preview(kind,point);
     if(kind==='settle')return this.settlePreview(point);
     if(kind==='rally')return this.beaconPreview(point);
@@ -113,7 +113,7 @@ export class Settlement {
       const shore=this.foodSystem.preview('fishing',point);
       return {...shore,kind:'dock',wood:BUILD_COST.dock,message:shore.allowed?`Mark a dock here · ${BUILD_COST.dock} wood${this.state.wood<BUILD_COST.dock?' to gather':''}`:shore.message};
     }
-    const p={x:Math.round(point.x*2)/2,z:Math.round(point.z*2)/2,kind:kind as BuildKind},s=this.state;
+    const p={x:Math.round(point.x*2)/2,z:Math.round(point.z*2)/2,kind:kind as BuildKind,rotation:point.rotation??0},s=this.state;
     const result=(allowed:boolean,message:string):GuidancePreview=>({...p,kind,allowed,message,wood:BUILD_COST[kind]});
     if(!s.camp||!s.settlers.length)return result(false,'Invite followers before guiding a new building.');
     if(!ignoreOrder&&(s.orders.length>=ORDER_LIMIT||s.plots.length+s.orders.length>=40))return result(false,'Finish or withdraw a request before marking another site.');
@@ -133,15 +133,15 @@ export class Settlement {
     // A follower standing on the site can leave it before construction starts.
     const planned=this.plannedNavigation(kind!=='farm'?p:undefined);
     if(!planned.route(s.camp,access)||!s.settlers.some(w=>!w.stranded&&(planned.route(w,access)||this.insideSite(w,p)&&this.nav.route(w,access))))return result(false,'Leave a path around the planned buildings to reach this entrance.');
-    return result(true,`Mark a ${BUILD_LABEL[kind].toLowerCase()} here · ${BUILD_COST[kind]} wood${s.wood<BUILD_COST[kind]?' to gather':''}`);
+    return result(true,`Mark a ${BUILD_LABEL[kind].toLowerCase()} here · ${BUILD_COST[kind]} wood${s.wood<BUILD_COST[kind]?' to gather':''} · Hold and drag to rotate`);
   }
-  guide(kind:GuidanceKind,p:Point):GuidancePreview{
+  guide(kind:GuidanceKind,p:Point&{rotation?:number}):GuidancePreview{
     if(kind==='fishing'||kind==='trap')return this.foodSystem.guide(kind,p);
     if(kind==='settle'){const preview=this.settlePreview(p);if(preview.allowed){this.add(2,preview);return {...preview,message:'Your first followers have arrived at your chosen camp.'};}return preview;}
     if(kind==='rally')return this.gather(p);
     if(kind==='rain'||kind==='bloom'){const preview=this.powerPreview(kind,p);if(preview.allowed)this.power(kind,p);return preview;}
     const preview=this.guidancePreview(kind,p);if(!preview.allowed)return preview;
-    const order={id:this.id(),kind,x:preview.x,z:preview.z};this.state.orders.push(order);
+    const order={id:this.id(),kind,x:preview.x,z:preview.z,rotation:kind==='dock'?0:preview.rotation??0};this.state.orders.push(order);
     this.needDiscovery=true;this.orderMessages.set(order.id,'Waiting for followers');
     const message=`Your followers will build a ${BUILD_LABEL[kind].toLowerCase()} at the marked site.`;this.event(message);
     return {...preview,message};
@@ -319,10 +319,10 @@ export class Settlement {
     if(!p)return;
     this.startPlot(kind,p);
   }
-  private startPlot(kind:BuildKind,p:Point,guidedId?:number){
+  private startPlot(kind:BuildKind,p:Point&{rotation?:number},guidedId?:number){
     const f=this.metadata.inspect(p.x,p.z);if(!f)return;
     this.state.wood-=BUILD_COST[kind];
-    this.state.plots.push({x:p.x,z:p.z,id:guidedId??this.id(),kind,guided:guidedId!==undefined,stage:'building',progress:0,valid:true,claimedBy:null,supplied:0,pendingWood:BUILD_COST[kind],
+    this.state.plots.push({x:p.x,z:p.z,rotation:kind==='dock'?0:p.rotation??0,id:guidedId??this.id(),kind,guided:guidedId!==undefined,stage:'building',progress:0,valid:true,claimedBy:null,supplied:0,pendingWood:BUILD_COST[kind],
       moisture:.68,fertility:f.fertilityEstimate,crop:0,planted:false,harvests:0,
       ...((kind==='coop'||kind==='pigpen')?{stock:0,breed:0,fed:false,priority:'breed' as const,keeperId:null}:{}),
       ...(kind==='temple'?{offerings:0}:kind==='slaughterhouse'?{livestock:0,rearing:false,rearingProgress:0,processed:0}:kind==='dock'?{boats:[],boatState:'none' as const,boatProgress:0,boatTrips:0,boatFish:0}:{})});

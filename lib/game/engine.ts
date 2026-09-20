@@ -62,15 +62,16 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),hitPoint=new THREE.Vector3();const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-SEA);
  const pointers=new Map<number,{x:number;y:number}>();let lastX=0,lastY=0,pressed=false,sculpting=false,dragButton=0,strokeY=0,dirty=false,strokeChanged=false,strokeSnapshot:Float32Array|null=null,lastStampPoint:THREE.Vector3|null=null,lastPaint=0,touchPending=false,touchStartTime=0,strokeStart={x:0,y:0},clickStart={x:0,y:0},followingIslander:number|null=null;
  const history:Float32Array[]=[];let stroke:SculptStroke|null=null;
- let placement:GuidancePreview|null=null,pendingGuidance:{kind:GuidanceKind;pointer:number}|null=null,previewKey='',previewTime=0;
+ let placement:GuidancePreview|null=null,pendingGuidance:{kind:GuidanceKind;pointer:number;started:number;startX:number;point:THREE.Vector3;rotation:number;rotating:boolean}|null=null,previewKey='',previewTime=0;
+ const rotatable=(kind:GuidanceKind)=>!['fishing','trap','settle','rally','rain','bloom','dock'].includes(kind);
  function makeRay(x:number,y:number){const r=canvas.getBoundingClientRect();ndc.set((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);}
  function pick(x:number,y:number,flat=false){makeRay(x,y);if(!flat){const hit=pickTerrain(ray.ray,terrain,camera.far);if(hit)return hit;}plane.constant=-(flat?strokeY:SEA);return ray.ray.intersectPlane(plane,hitPoint)?.clone()??null;}
  function showBrush(p:THREE.Vector3|null){brush.visible=!!p&&sculptTool(settings.tool)&&pointers.size<2;if(p){brush.position.set(p.x,Math.max(terrain.height(p.x,p.z)+.09,SEA+.06),p.z);brush.scale.setScalar(settings.brush);ringMaterial.color.set(settings.tool==='lower'?'#ffe7bb':settings.tool==='path'?'#fff8cc':'#f3ffe8');}}
  function hideGuidance(){guidanceCursor.show(null);placement=null;previewKey='';}
- function showGuidance(p:THREE.Vector3|null,kind:GuidanceKind|null=guideKind(settings.tool)){
+ function showGuidance(p:THREE.Vector3|null,kind:GuidanceKind|null=guideKind(settings.tool),rotation=0){
   if(!p||!kind||pointers.size>1){hideGuidance();return;}
-  const x=Math.round(p.x*2)/2,z=Math.round(p.z*2)/2,key=`${kind}:${x},${z}:${settings.paused}`;
-  if(key!==previewKey){placement=simulation.guidancePreview(kind,{x,z});if(settings.paused&&(kind==='rain'||kind==='bloom'))placement={...placement,allowed:false,message:'Resume the village to place a blessing.'};previewKey=key;}
+  const x=Math.round(p.x*2)/2,z=Math.round(p.z*2)/2,key=`${kind}:${x},${z}:${rotation}:${settings.paused}`;
+  if(key!==previewKey){placement=simulation.guidancePreview(kind,{x,z,rotation});if(settings.paused&&(kind==='rain'||kind==='bloom'))placement={...placement,allowed:false,message:'Resume the village to place a blessing.'};previewKey=key;}
   guidanceCursor.show(placement);brush.visible=false;
  }
  let strokeBounds:{minX:number;maxX:number;minZ:number;maxZ:number}|undefined;
@@ -85,7 +86,7 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  function pointerDown(e:PointerEvent){hoverPending=null;if(e.button!==0&&e.button!==2&&e.button!==1)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});lastX=e.clientX;lastY=e.clientY;clickStart={x:e.clientX,y:e.clientY};pressed=true;dragButton=e.button;
  if(pointers.size>1){pendingGuidance=null;hideGuidance();if(sculpting&&strokeSnapshot&&strokeChanged){terrain.values.set(strokeSnapshot);terrain.revision++;terrain.waterRevision++;simulation.metadata.invalidate();dirty=true;rebuild();}strokeChanged=false;finishStroke();brush.visible=false;return;}
  const kind=guideKind(settings.tool);
- if(kind&&e.button===0){pendingGuidance={kind,pointer:e.pointerId};showGuidance(pick(e.clientX,e.clientY),kind);return;}
+ if(kind&&e.button===0){const point=pick(e.clientX,e.clientY);if(!point)return;pendingGuidance={kind,pointer:e.pointerId,started:performance.now(),startX:e.clientX,point,rotation:0,rotating:false};showGuidance(point,kind);return;}
  if(sculptTool(settings.tool)&&e.button===0){hideGuidance();const p=pick(e.clientX,e.clientY);if(!p)return;strokeY=Math.max(SEA,p.y);stroke=terrain.beginStroke(p.x,p.z,settings.tool);strokeSnapshot=stroke.snapshot;strokeChanged=false;sculpting=true;strokeStart={x:e.clientX,y:e.clientY};touchPending=e.pointerType==='touch';touchStartTime=performance.now();if(!touchPending){paint(e.clientX,e.clientY,true);rebuild();}else showBrush(p);}
  }
  function pan(dx:number,dy:number){followingIslander=null;const scale=(camera.right-camera.left)/host.clientWidth;const right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));const forward=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));target.addScaledVector(right,-dx*scale);target.addScaledVector(forward,-dy*scale/Math.max(.4,Math.sin(pitch)));target.x=THREE.MathUtils.clamp(target.x,-EXTENT*.43,EXTENT*.43);target.z=THREE.MathUtils.clamp(target.z,-EXTENT*.43,EXTENT*.43);updateCamera();}
@@ -94,7 +95,11 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  if(pointers.size>=2&&pointers.has(e.pointerId)){const prev=[...pointers.values()],oldDist=Math.hypot(prev[0].x-prev[1].x,prev[0].y-prev[1].y),oldMid={x:(prev[0].x+prev[1].x)/2,y:(prev[0].y+prev[1].y)/2};pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const next=[...pointers.values()],dist=Math.hypot(next[0].x-next[1].x,next[0].y-next[1].y);if(oldDist>5&&dist>5)view=THREE.MathUtils.clamp(view*oldDist/dist,3.8,150);pan((next[0].x+next[1].x)/2-oldMid.x,(next[0].y+next[1].y)/2-oldMid.y);brush.visible=false;hideGuidance();return;}
  if(pointers.has(e.pointerId))pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
  if(pressed&&pointers.has(e.pointerId)){const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.hypot(e.clientX-clickStart.x,e.clientY-clickStart.y)>6)followingIslander=null;
- if(pendingGuidance){hoverPending={x:e.clientX,y:e.clientY};}else if(sculpting){if(touchPending&&performance.now()-touchStartTime>120)startPendingTouch();if(!touchPending&&performance.now()-lastPaint>55)paint(e.clientX,e.clientY);}else if(dragButton!==0||e.shiftKey){pan(dx,dy);}else{yaw-=dx*.006;pitch=THREE.MathUtils.clamp(pitch+dy*.004,.4,Math.PI/2-.001);updateCamera();}
+ if(pendingGuidance){
+  if(rotatable(pendingGuidance.kind)&&(pendingGuidance.rotating||performance.now()-pendingGuidance.started>=300)){
+   pendingGuidance.rotating=true;const step=Math.PI/12;pendingGuidance.rotation=Math.round((e.clientX-pendingGuidance.startX)*.012/step)*step;showGuidance(pendingGuidance.point,pendingGuidance.kind,pendingGuidance.rotation);
+  }else hoverPending={x:e.clientX,y:e.clientY};
+ }else if(sculpting){if(touchPending&&performance.now()-touchStartTime>120)startPendingTouch();if(!touchPending&&performance.now()-lastPaint>55)paint(e.clientX,e.clientY);}else if(dragButton!==0||e.shiftKey){pan(dx,dy);}else{yaw-=dx*.006;pitch=THREE.MathUtils.clamp(pitch+dy*.004,.4,Math.PI/2-.001);updateCamera();}
  lastX=e.clientX;lastY=e.clientY;
  }else{hoverPending={x:e.clientX,y:e.clientY};}
  }
@@ -102,8 +107,8 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  if(pendingGuidance&&pendingGuidance.pointer===e.pointerId){
   const request=pendingGuidance;pendingGuidance=null;
   if(e.type!=='pointercancel'&&e.button===0&&pointers.size===1&&guideKind(settings.tool)===request.kind&&document.elementFromPoint(e.clientX,e.clientY)===canvas){
-   const p=pick(e.clientX,e.clientY);
-   if(p){if(settings.paused&&(request.kind==='rain'||request.kind==='bloom')){onGuidance('Resume the village to place a blessing.');}else{const result=simulation.guide(request.kind,{x:Math.round(p.x*2)/2,z:Math.round(p.z*2)/2});onGuidance(result.message);if(result.allowed){saveNow();if(request.kind==='settle'){target.set(p.x,terrain.height(p.x,p.z),p.z);view=24;updateCamera();}}}}
+   const p=request.rotating?request.point:pick(e.clientX,e.clientY);
+   if(p){if(settings.paused&&(request.kind==='rain'||request.kind==='bloom')){onGuidance('Resume the village to place a blessing.');}else{const result=simulation.guide(request.kind,{x:Math.round(p.x*2)/2,z:Math.round(p.z*2)/2,rotation:request.rotation});onGuidance(result.message);if(result.allowed){saveNow();if(request.kind==='settle'){target.set(p.x,terrain.height(p.x,p.z),p.z);view=24;updateCamera();}}}}
   }
   hideGuidance();
  }
@@ -118,13 +123,14 @@ export function createGame(host:HTMLDivElement,onReady:()=>void,onHistory:(n:num
  let hoverPending:{x:number;y:number}|null=null;
  let frame=0,last=performance.now(),elapsed=0,lastRebuild=0,lastSave=performance.now(),lastWaterContacts=-1000;
  const draw=(now:number)=>{frame=requestAnimationFrame(draw);const dt=Math.min((now-last)/1000,.05);last=now;if(!settings.paused)elapsed+=dt;
- if(hoverPending){const pointer=hoverPending;hoverPending=null;if(pendingGuidance&&pointers.size===1){showGuidance(pick(pointer.x,pointer.y),pendingGuidance.kind);}else if(!pressed&&(sculptTool(settings.tool)||guideKind(settings.tool))){const p=pick(pointer.x,pointer.y);if(guideKind(settings.tool))showGuidance(p);else showBrush(p);}}
+ if(hoverPending){const pointer=hoverPending;hoverPending=null;if(pendingGuidance&&pointers.size===1&&!pendingGuidance.rotating){showGuidance(pick(pointer.x,pointer.y),pendingGuidance.kind);}else if(!pressed&&(sculptTool(settings.tool)||guideKind(settings.tool))){const p=pick(pointer.x,pointer.y);if(guideKind(settings.tool))showGuidance(p);else showBrush(p);}}
+ if(pendingGuidance&&rotatable(pendingGuidance.kind)&&!pendingGuidance.rotating&&now-pendingGuidance.started>=300){pendingGuidance.rotating=true;showGuidance(pendingGuidance.point,pendingGuidance.kind,pendingGuidance.rotation);}
  if(sculpting&&touchPending&&now-touchStartTime>120)startPendingTouch();
  if(sculpting&&!touchPending&&now-lastPaint>110&&pointers.size===1){const p=[...pointers.values()][0];paint(p.x,p.y);}
  if(dirty&&now-lastRebuild>115){rebuild();lastRebuild=now;}
  if(!sculptTool(settings.tool))brush.visible=false;
  if(!guideKind(settings.tool))hideGuidance();
- else if(placement&&now-previewTime>250){previewTime=now;previewKey='';showGuidance(new THREE.Vector3(placement.x,0,placement.z));}
+ else if(placement&&now-previewTime>250){previewTime=now;previewKey='';showGuidance(new THREE.Vector3(placement.x,0,placement.z),placement.kind,placement.rotation??0);}
  if(pendingGuidance&&guideKind(settings.tool)!==pendingGuidance.kind)pendingGuidance=null;canvas.style.cursor=settings.tool==='move'?(pressed?'grabbing':'grab'):'crosshair';
  refreshScenery();
  if(now-lastWaterContacts>1000&&!sculpting){ocean.setWaterContacts(simulation.state.plots.filter(p=>terrain.height(p.x,p.z)<SEA).map(p=>({x:p.x,z:p.z,radius:p.kind==='home'?.65:1.25})));lastWaterContacts=now;}

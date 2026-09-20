@@ -172,6 +172,19 @@ test('placement previews are read-only and reuse visible geometry for huts and f
   }finally{cursor.dispose();terrain.dispose();}
 });
 
+test('building rotation is previewed, constructed and preserved in saves',()=>{
+  const {terrain,sim}=flat(),cursor=new GuidanceCursor(terrain);try{
+    const rotation=Math.PI/3,p={x:1,z:3,rotation};
+    const preview=sim.guidancePreview('home',p);cursor.show(preview);
+    assert.equal(cursor.group.rotation.y,rotation);assert.ok(sim.guide('home',p).allowed);
+    assert.equal(sim.state.orders[0].rotation,rotation);
+    sim.state.wood=20;sim.startPlot('home',sim.state.orders[0],sim.state.orders[0].id);sim.state.orders=[];
+    assert.equal(sim.state.plots[0].rotation,rotation);
+    const restored=decodeSave(encodeSave(terrain.values,sim.state));
+    assert.equal(restored.world.plots[0].rotation,rotation);
+  }finally{cursor.dispose();terrain.dispose();}
+});
+
 test('fire buildings use supplied construction and survive saves',()=>{
   const {terrain,sim}=flat();try{
     sim.state.wood=40;sim.state.food=200;

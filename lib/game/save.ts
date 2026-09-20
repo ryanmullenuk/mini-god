@@ -86,6 +86,7 @@ export function decodeSave(raw:string):IslandSave{
   }
   for(const order of orders){
     if(!record(order)||!['home','farm','dock','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(order.kind as string)||!finite(order.x,-EXTENT/2+2,EXTENT/2-2)||!finite(order.z,-EXTENT/2+2,EXTENT/2-2)||!Number.isInteger(order.x*2)||!Number.isInteger(order.z*2))fail();
+    if(order.rotation!==undefined&&!finite(order.rotation,-Math.PI*2,Math.PI*2))fail();
   }
   for(const w of settlers){
     if(!record(w)||!integer(w.id,1)||typeof w.name!=='string'||w.name.length>40||!finite(w.heading)||typeof w.moving!=='boolean'||typeof w.stranded!=='boolean'||!record(w.cargo))return fail();
@@ -111,6 +112,7 @@ export function decodeSave(raw:string):IslandSave{
   }
   for(const p of plots){
     if(!record(p)||!['home','farm','dock','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(p.kind as string)||!['building','complete'].includes(p.stage as string)||!finite(p.progress,0,1)||!finite(p.moisture,0,1)||!finite(p.fertility,0,1)||!finite(p.crop,0,1)||!integer(p.harvests)||typeof p.valid!=='boolean'||typeof p.planted!=='boolean'||!(p.claimedBy===null||workerIds.has(p.claimedBy as number)))return fail();
+    if(p.rotation!==undefined&&!finite(p.rotation,-Math.PI*2,Math.PI*2))fail();
     if(p.kind==='dock'&&(!['none','building','at-sea','docked'].includes(p.boatState as string)||!finite(p.boatProgress,0,1)||!integer(p.boatTrips)||!integer(p.boatFish,0,20)||!Array.isArray(p.boats)||p.boats.length>5))fail();
     if(p.kind==='dock')for(const boat of p.boats as unknown[]){if(!record(boat)||!['building','at-sea','docked'].includes(boat.state as string)||!finite(boat.progress,0,1)||!finite(boat.returnAt,0,1e9)||!finite(boat.departAt,0,s.time)||!integer(boat.trips)||!integer(boat.fish,0,20)||boat.targetX!==undefined&&!finite(boat.targetX,-EXTENT/2,EXTENT/2)||boat.targetZ!==undefined&&!finite(boat.targetZ,-EXTENT/2,EXTENT/2)||boat.schoolId!==undefined&&!integer(boat.schoolId,1,8))fail();}
     if(p.kind==='temple'&&!integer(p.offerings,0,50))fail();

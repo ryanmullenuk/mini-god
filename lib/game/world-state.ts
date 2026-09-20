@@ -21,10 +21,10 @@ export const VILLAGE_BALANCE={hutCapacity:5,cottageCapacity:7,cottageWood:12,cot
 export const homeCapacity=(p:Plot)=>p.level===2?VILLAGE_BALANCE.cottageCapacity:VILLAGE_BALANCE.hutCapacity;
 export const constructionCost=(p:Plot)=>p.upgrading?VILLAGE_BALANCE.cottageWood:BUILD_COST[p.kind];
 export const ORDER_LIMIT = 8;
-export type BuildOrder = Point & { id: number; kind: BuildKind };
+export type BuildOrder = Point & { id: number; kind: BuildKind; rotation?: number };
 export type GuidanceKind = BuildKind | 'fishing' | 'trap' | 'settle' | 'rally' | 'rain' | 'bloom';
 export type Beacon = Point & { id: number; expires: number; members: { id: number; destination: Point; phase: 'waiting' | 'walking' | 'arrived' | 'done'; arrivedAt: number }[] };
-export type GuidancePreview = Point & { kind: GuidanceKind; allowed: boolean; message: string; wood: number; radius?: number };
+export type GuidancePreview = Point & { kind: GuidanceKind; allowed: boolean; message: string; wood: number; radius?: number; rotation?: number };
 export type Job = { kind: JobKind; target: number; route: Point[]; work: number; destination?:number; herd?:number[] };
 export type Settler = Point & {
   id: number; name: string; heading: number; moving: boolean; stranded: boolean;
@@ -33,7 +33,7 @@ export type Settler = Point & {
 };
 export type FishingBoat = {state:'building'|'at-sea'|'docked';progress:number;returnAt:number;departAt:number;trips:number;fish:number;targetX?:number;targetZ?:number;schoolId?:number};
 export type Plot = Point & {
-  id: number; kind: BuildKind; stage: 'building' | 'complete'; progress: number;
+  id: number; kind: BuildKind; stage: 'building' | 'complete'; progress: number; rotation?: number;
   valid: boolean; claimedBy: number | null; moisture: number; fertility: number;
   crop: number; planted: boolean; harvests: number;
   offerings?: number; livestock?: number; rearing?: boolean; rearingProgress?: number; processed?: number;

@@ -52,6 +52,7 @@ export class GuidanceCursor {
     this.home.visible=preview.kind==='granary'||preview.kind==='storehouse'||preview.kind==='home'||preview.kind==='coop'||preview.kind==='pigpen';this.farm.visible=preview.kind==='farm';this.dock.visible=preview.kind==='dock';this.beacon.visible=(preview.kind==='rally'||preview.kind==='settle'||preview.kind==='fishing'||preview.kind==='trap');this.temple.visible=preview.kind==='temple';this.slaughterhouse.visible=preview.kind==='slaughterhouse';
     this.blessing.visible=preview.kind==='rain'||preview.kind==='bloom';this.blessing.scale.setScalar(preview.radius??1);this.boundary.visible=!this.blessing.visible;
     this.group.position.set(preview.x,Math.max(SEA+.1,this.terrain.height(preview.x,preview.z))+.035,preview.z);
+    this.group.rotation.y=preview.rotation??0;
     const colour=preview.allowed?'#b8e3ab':'#ee987f';this.edge.color.set(colour);this.fill.color.set(colour);
   }
   dispose(){this.group.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});this.edge.dispose();this.fill.dispose();this.group.clear();}

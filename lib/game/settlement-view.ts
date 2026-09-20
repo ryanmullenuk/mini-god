@@ -250,6 +250,7 @@ export class SettlementView {
         this.orders.set(order.id,root);this.group.add(root);
       }
       root.position.set(order.x,Math.max(SEA+.1,this.terrain.height(order.x,order.z))+.035,order.z);
+      root.rotation.y=order.rotation??0;
     }
     this.camp.visible=!!s.camp;if(s.camp)this.camp.position.set(s.camp.x,Math.max(SEA,this.terrain.height(s.camp.x,s.camp.z)),s.camp.z);
     const phase=(s.time%DAY_SECONDS)/DAY_SECONDS;
@@ -257,7 +258,7 @@ export class SettlementView {
     let lightIndex=0;
     for(const light of this.fireLights)light.intensity=0;
     for(const p of s.plots){
-      const v=this.plots.get(p.id)??this.makePlot(p),height=Math.max(SEA+.06,this.terrain.height(p.x,p.z));v.root.position.set(p.x,height,p.z);
+      const v=this.plots.get(p.id)??this.makePlot(p),height=Math.max(SEA+.06,this.terrain.height(p.x,p.z));v.root.position.set(p.x,height,p.z);v.root.rotation.y=p.rotation??0;
       v.building.visible=p.valid;
       const complete=p.stage==='complete';
       v.building.scale.y=p.kind==='home'?B.visuals.hut:!complete?.15+p.progress*.85:1;
