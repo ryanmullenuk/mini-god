@@ -13,6 +13,7 @@ export class SettlementView {
   private orders=new Map<number,THREE.Group>();
   private opportunities=new THREE.Group();
   private influence=new THREE.Group();
+  private fishShadows:THREE.InstancedMesh;
   private influenceKey='';
   private camp=new THREE.Group();
   private beacon=new THREE.Group();
@@ -25,6 +26,9 @@ export class SettlementView {
   constructor(private terrain:Terrain){
     this.group.add(...this.fireLights);
     this.group.add(this.camp,this.opportunities,this.beacon,this.influence);
+    const fishShape=new THREE.Shape();fishShape.moveTo(-.24,0);fishShape.quadraticCurveTo(0,.15,.28,0);fishShape.quadraticCurveTo(0,-.15,-.24,0);fishShape.lineTo(-.42,.16);fishShape.lineTo(-.4,-.16);fishShape.closePath();
+    const fishGeometry=new THREE.ShapeGeometry(fishShape);fishGeometry.rotateX(-Math.PI/2);
+    this.fishShadows=new THREE.InstancedMesh(fishGeometry,new THREE.MeshBasicMaterial({color:'#093f57',transparent:true,opacity:.24,depthWrite:false}),144);this.fishShadows.frustumCulled=false;this.group.add(this.fishShadows);
     const beaconMaterial=new THREE.MeshBasicMaterial({color:'#fff0a4',transparent:true,opacity:.7,depthWrite:false});
     this.beaconGlow=new THREE.Mesh(new THREE.OctahedronGeometry(.3),beaconMaterial);this.beaconGlow.position.y=2.8;this.beacon.add(this.beaconGlow);
     const beam=new THREE.Mesh(new THREE.CylinderGeometry(.035,.13,2.5,12),new THREE.MeshBasicMaterial({color:'#fff0a4',transparent:true,opacity:.3,depthWrite:false}));beam.position.y=1.3;this.beacon.add(beam);
@@ -73,9 +77,16 @@ export class SettlementView {
       for(let i=0;i<7;i++)this.box(building,1.65,.11,.28,i%2?'#9a7046':'#ae8354',0,.18,.25+i*.31);
       for(const x of [-.72,.72])for(const z of [.2,1.2,2.1])this.mesh(building,new THREE.CylinderGeometry(.055,.075,.75,6),'#6f5338',x,-.08,z);
       for(const x of [-.78,.78])this.box(building,.10,.18,2.25,'#795a3c',x,.26,1.15);
-      const hull=this.mesh(boat,new THREE.SphereGeometry(.58,8,5),'#8e552f',0,.32,2.45);hull.scale.set(1,.42,1.85);
-      this.box(boat,.82,.08,1.25,'#d3a160',0,.52,2.45);this.mesh(boat,new THREE.CylinderGeometry(.025,.035,1.55,6),'#725037',0,1.15,2.45);
-      const sail=this.mesh(boat,new THREE.ConeGeometry(.52,1.1,3),'#eee1b8',.18,1.27,2.45);sail.rotation.z=-Math.PI/2;sail.rotation.y=Math.PI/2;
+      const hull=this.mesh(boat,new THREE.SphereGeometry(.54,8,4),'#8e552f',0,.34,2.45);hull.scale.set(.72,.42,2.25);
+      this.box(boat,.62,.10,1.55,'#c68b4d',0,.53,2.45);
+      const float=this.mesh(boat,new THREE.SphereGeometry(.17,7,3),'#a96c36',-1.0,.28,2.45);float.scale.set(.65,.42,4.6);
+      for(const z of [1.75,2.45,3.15])this.box(boat,1.95,.055,.07,'#81532f',-.38,.48,z);
+      this.mesh(boat,new THREE.CylinderGeometry(.035,.045,2.25,7),'#704527',0,1.62,2.45);
+      const sailShape=new THREE.Shape();sailShape.moveTo(.02,.05);sailShape.lineTo(.02,1.95);sailShape.lineTo(.92,.18);sailShape.closePath();
+      const sail=this.mesh(boat,new THREE.ShapeGeometry(sailShape),'#f0d79e',.04,.64,2.43);sail.material=this.material('#f0d79e');
+      for(const [r,y] of [[.30,1.72],[.22,1.71],[.13,1.70]] as const){const mark=this.mesh(boat,new THREE.TorusGeometry(r,.035,5,18),'#c66f3c',.40,y,2.415);mark.scale.y=.72;}
+      this.box(boat,.52,.26,.42,'#76502f',.13,.66,2.72);
+      for(let i=0;i<5;i++){const fish=this.mesh(boat,new THREE.IcosahedronGeometry(.055,0),'#a6b8b5',-.18+i*.09,.84,2.72);fish.scale.z=1.8;}
     }else if(p.kind==='home'){building.scale.setScalar(B.visuals.hut);
       this.box(building,1.85,.11,1.85,'#d7c8a5',0,.04,0);
       this.box(building,1.62,1.18,1.52,'#f1ead7',0,.67,-.08);
@@ -201,6 +212,13 @@ export class SettlementView {
   terrainChanged(){this.opportunityKey='';this.influenceKey='';}
   update(sim:Settlement,showPlots:boolean,showInfluence=false){
     const s=sim.state;
+    let fishIndex=0;
+    for(const school of s.fishSchools)for(let i=0;i<24;i++){
+      const a=i*2.399963+school.id*.71,r=.6+(i%7)*.23,active=school.visits<10;
+      this.dummy.position.set(school.x+Math.sin(a)*r,SEA+.015,school.z+Math.cos(a)*r);this.dummy.rotation.set(0,a+Math.sin(i)*.35,0);this.dummy.scale.setScalar(active?.75+((i*13)%5)*.08:0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex++,this.dummy.matrix);
+    }
+    for(;fishIndex<144;fishIndex++){this.dummy.scale.setScalar(0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex,this.dummy.matrix);}
+    this.fishShadows.instanceMatrix.needsUpdate=true;
     this.influence.visible=showInfluence;
     if(showInfluence){
       const areas=sim.influenceAreas(),key=JSON.stringify(areas);
@@ -246,7 +264,14 @@ export class SettlementView {
         let best={x:0,z:1,h:Infinity};for(let i=0;i<16;i++){const a=i*Math.PI/8,x=Math.sin(a)*3,z=Math.cos(a)*3,h=this.terrain.height(p.x+x,p.z+z);if(h<best.h)best={x,z,h};}
         v.root.rotation.y=Math.atan2(best.x,best.z);v.boat.visible=complete&&p.boatState!=='none';
         if(p.boatState==='building'){v.boat.position.z=0;v.boat.scale.setScalar(.18+.82*(p.boatProgress??0));}
-        else{v.boat.scale.setScalar(1);const remaining=Math.max(0,(p.boatReturnAt??s.time)-s.time),voyage=p.boatState==='at-sea'?Math.sin(Math.PI*(1-remaining/60))*48:0;v.boat.position.z=voyage;v.boat.position.y=Math.sin(s.time*2.2)*.05;}
+        else{
+          v.boat.scale.setScalar(1);let x=0,z=0;
+          if(p.boatState==='at-sea'&&p.boatTargetX!==undefined&&p.boatTargetZ!==undefined){
+            const duration=Math.max(.001,(p.boatReturnAt??s.time)-(p.boatDepartAt??s.time)),phase=THREE.MathUtils.clamp((s.time-(p.boatDepartAt??s.time))/duration,0,1),travel=Math.sin(Math.PI*phase),dx=p.boatTargetX-p.x,dz=p.boatTargetZ-p.z,theta=v.root.rotation.y;
+            x=(Math.cos(theta)*dx-Math.sin(theta)*dz)*travel;z=(Math.sin(theta)*dx+Math.cos(theta)*dz)*travel;
+          }
+          v.boat.position.x=x;v.boat.position.z=z;v.boat.position.y=Math.sin(s.time*2.2)*.05;
+        }
       }
       if(p.kind==='torch'||p.kind==='bonfire'){
         const fire=v.building.getObjectByName('fire')!,halo=v.building.getObjectByName('fire-halo')!;

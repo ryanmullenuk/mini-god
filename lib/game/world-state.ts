@@ -12,7 +12,7 @@ export type FishingArea = Point & {id:number;water:Point;stock:number;recovery:n
 export type PigTrap = Point & {id:number;phase:'planned'|'armed'|'caught'|'empty';claimedBy:number|null};
 export type FoodState = {initialized:boolean;animals:WildAnimal[];fishing:FishingArea[];traps:PigTrap[];training:number[];hunting:number[];seed:number};
 export const newFoodState=():FoodState=>({initialized:false,animals:[],fishing:[],traps:[],training:[],hunting:[],seed:68129});
-export type JobKind = FoodJob | 'wood' | 'forage' | 'build' | 'plant' | 'harvest' | 'deliver' | 'clear' | 'rally' | 'worship' | 'butcher' | 'supply' | 'gather';
+export type JobKind = FoodJob | 'wood' | 'forage' | 'build' | 'plant' | 'harvest' | 'deliver' | 'unload-boat' | 'clear' | 'rally' | 'worship' | 'butcher' | 'supply' | 'gather';
 export type BuildKind = 'home' | 'farm' | 'dock' | 'temple' | 'slaughterhouse' | 'coop' | 'pigpen' | 'granary' | 'storehouse' | 'torch' | 'bonfire';
 export const BUILD_LABEL: Record<BuildKind,string> = {torch:'Tiki torch',bonfire:'Bonfire',home:'Hut',farm:'Farm',dock:'Dock',temple:'Temple',slaughterhouse:'Slaughterhouse',coop:'Chicken coop',pigpen:'Pig pen',granary:'Granary',storehouse:'Storehouse'};
 export const BUILD_TIME = {torch:8,bonfire:16,dock:28,granary:36,storehouse:32,home:24,farm:15,temple:48,slaughterhouse:36,coop:B.buildings.coop.seconds,pigpen:B.buildings.pigpen.seconds} as const;
@@ -29,7 +29,7 @@ export type Job = { kind: JobKind; target: number; route: Point[]; work: number;
 export type Settler = Point & {
   id: number; name: string; heading: number; moving: boolean; stranded: boolean;
   lastGather?: number; lastWorship?: number; huntingSkill?:number; weapon?:boolean;
-  job: Job | null; cargo: { wood: number; food: number; harvest: number; animal?: {species:Species;destination:number}; feed?:number; construction?:{site:number;wood:number} };
+  job: Job | null; cargo: { wood: number; food: number; harvest: number; boatFish?:number; animal?: {species:Species;destination:number}; feed?:number; construction?:{site:number;wood:number} };
 };
 export type Plot = Point & {
   id: number; kind: BuildKind; stage: 'building' | 'complete'; progress: number;
@@ -39,8 +39,9 @@ export type Plot = Point & {
   young?:number[]; stock?:number; breed?:number; fed?:boolean; priority?:'breed'|'food'; keeperId?:number|null; poultry?:number; pork?:number;
   level?:1|2; upgrading?:boolean; upgradeProgress?:number; supplied?:number; pendingWood?:number;
   guided?: boolean; farmerId?: number | null;
-  boatState?:'none'|'building'|'at-sea'|'docked';boatProgress?:number;boatReturnAt?:number;boatTrips?:number;
+  boatState?:'none'|'building'|'at-sea'|'docked';boatProgress?:number;boatReturnAt?:number;boatTrips?:number;boatFish?:number;boatDepartAt?:number;boatTargetX?:number;boatTargetZ?:number;boatSchoolId?:number;
 };
+export type FishSchool = Point & {id:number;visits:number;regenAt:number};
 export type Resource = Point & {
   id: number; kind: 'wood' | 'forage'; stock: number; capacity: number; regrowth: number;
   claimedBy: number | null; valid: boolean;
@@ -52,7 +53,7 @@ export type WorldState = {
   foodSystem:FoodState; version: 1; time: number; tick: number; nextId: number; seed: number; camp: Point | null;
   food: number; wood: number; faith: number; rain: number; blessing: number;
   tier: 1 | 2; rainArea: (Point & {radius:number}) | null;
-  settlers: Settler[]; plots: Plot[]; resources: Resource[]; trails: Trail[];
+  settlers: Settler[]; plots: Plot[]; resources: Resource[]; trails: Trail[]; fishSchools: FishSchool[];
   orders: BuildOrder[]; beacon: Beacon | null;
   prayer: Prayer | null; prayerCooldown: Partial<Record<PrayerKind, number>>;
   answered: number; deliveredFood: number; deliveredWood: number; harvestedFood: number;
@@ -71,12 +72,12 @@ export type SettlementStatus = {
   beacon: { id: number; message: string; remaining: number } | null;
   buildings: { occupants:string|null; name:string; upgrade:{allowed:boolean;message:string}|null; boatBuild?:{allowed:boolean;message:string}|null; workers:string; id: number; kind: BuildKind; farmerId: number | null; message: string; detail: string; progress: number | null }[];
   faithMessage: string; tier: number; milestone: string; offerings: number; temples: number; slaughterhouses: number;
-  dock:{id:number;state:'none'|'building'|'at-sea'|'docked';progress:number;trips:number;canBuild:boolean}|null;
+  dock:{id:number;state:'none'|'building'|'at-sea'|'docked';progress:number;trips:number;fish:number;hasStore:boolean;canBuild:boolean}|null;
   guidance: { id: number; kind: BuildKind; message: string; cancellable: boolean; progress: number | null }[];
 };
 export function newWorld(): WorldState {
   return { foodSystem:newFoodState(), version: 1, time: 0, tick: 0, nextId: 1, seed: 94721, camp: null,
-    food: 24, wood: 0, faith: 6, rain: 0, blessing: 0, tier: 1, rainArea: null, settlers: [], plots: [], resources: [], orders: [], beacon: null,
+    food: 24, wood: 0, faith: 6, rain: 0, blessing: 0, tier: 1, rainArea: null, settlers: [], plots: [], resources: [], fishSchools: [], orders: [], beacon: null,
     trails: [], prayer: null, prayerCooldown: {}, answered: 0, deliveredFood: 0,
     deliveredWood: 0, harvestedFood: 0, consumedFood: 0,
     lastEvent: 'An untouched island. Invite your first settlers.', eventTime: 0 };

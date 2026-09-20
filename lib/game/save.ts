@@ -65,14 +65,16 @@ export function decodeSave(raw:string):IslandSave{
   if((parsed.version as number)<3)s.orders=[];
   if((parsed.version as number)<4)s.beacon=null;
   if((parsed.version as number)<5){s.tier=1;s.rainArea=null;}
+  if(!Array.isArray(s.fishSchools))s.fishSchools=[];
   if(![1,2].includes(s.tier as number)||!(s.rainArea===null||point(s.rainArea)&&record(s.rainArea)&&finite(s.rainArea.radius,1,116)))fail();
   if(s.version!==1||!integer(s.tick,0,1e10)||!integer(s.nextId,1)||!integer(s.seed,0,4294967295)||!finite(s.time,0,1e9)||Math.abs(s.time-s.tick*.1)>.001||!(s.camp===null||point(s.camp)))return fail();
   for(const key of ['food','wood','faith','rain','blessing','answered','deliveredFood','deliveredWood','harvestedFood','consumedFood','eventTime'])if(!finite(s[key],0,1e9))fail();
   if(typeof s.lastEvent!=='string'||s.lastEvent.length>500||!record(s.prayerCooldown))return fail();
   for(const [key,value] of Object.entries(s.prayerCooldown))if(!['shelter','food','water','ground'].includes(key)||!finite(value,0,1e9))fail();
-  const groups=[['settlers',30],['plots',40],['resources',60],['trails',5000],['orders',ORDER_LIMIT]] as const;
+  const groups=[['settlers',30],['plots',40],['resources',60],['trails',5000],['fishSchools',8],['orders',ORDER_LIMIT]] as const;
   for(const [key,max] of groups)if(!Array.isArray(s[key])||(s[key] as unknown[]).length>max)return fail();
-  const settlers=s.settlers as unknown[],plots=s.plots as unknown[],resources=s.resources as unknown[],trails=s.trails as unknown[],orders=s.orders as unknown[];
+  const settlers=s.settlers as unknown[],plots=s.plots as unknown[],resources=s.resources as unknown[],trails=s.trails as unknown[],fishSchools=s.fishSchools as unknown[],orders=s.orders as unknown[];
+  for(const entry of plots)if(record(entry)&&entry.kind==='dock'&&entry.boatFish===undefined)entry.boatFish=0;
   if(plots.length+orders.length>40||orders.length>0&&!settlers.length)fail();
   const ids=new Set<number>(),workerIds=new Set<number>();
   for(const entry of [...settlers,...plots,...resources,...orders]){
@@ -89,8 +91,9 @@ export function decodeSave(raw:string):IslandSave{
     workerIds.add(w.id);
     for(const key of ['wood','food','harvest'])if(!finite(w.cargo[key],0,1000))fail();
     if((w.cargo.harvest as number)>(w.cargo.food as number))fail();
+    if(w.cargo.boatFish!==undefined&&(!finite(w.cargo.boatFish,0,20)||(w.cargo.boatFish as number)>(w.cargo.food as number)))fail();
     if(w.job!==null){
-      const j=w.job;if(!record(j)||![...FOOD_JOBS,'wood','forage','build','plant','harvest','deliver','clear','rally','worship','butcher','supply','gather'].includes(j.kind as string)||!integer(j.target)||!finite(j.work,0,1e6)||!Array.isArray(j.route)||j.route.length>40000||!j.route.every(point))fail();
+      const j=w.job;if(!record(j)||![...FOOD_JOBS,'wood','forage','build','plant','harvest','deliver','unload-boat','clear','rally','worship','butcher','supply','gather'].includes(j.kind as string)||!integer(j.target)||!finite(j.work,0,1e6)||!Array.isArray(j.route)||j.route.length>40000||!j.route.every(point))fail();
     }
   }
   if(s.beacon!==null){
@@ -105,7 +108,7 @@ export function decodeSave(raw:string):IslandSave{
   }
   for(const p of plots){
     if(!record(p)||!['home','farm','dock','temple','slaughterhouse','coop','pigpen','granary','storehouse','torch','bonfire'].includes(p.kind as string)||!['building','complete'].includes(p.stage as string)||!finite(p.progress,0,1)||!finite(p.moisture,0,1)||!finite(p.fertility,0,1)||!finite(p.crop,0,1)||!integer(p.harvests)||typeof p.valid!=='boolean'||typeof p.planted!=='boolean'||!(p.claimedBy===null||workerIds.has(p.claimedBy as number)))return fail();
-    if(p.kind==='dock'&&(!['none','building','at-sea','docked'].includes(p.boatState as string)||!finite(p.boatProgress,0,1)||!integer(p.boatTrips)))fail();
+    if(p.kind==='dock'&&(!['none','building','at-sea','docked'].includes(p.boatState as string)||!finite(p.boatProgress,0,1)||!integer(p.boatTrips)||!integer(p.boatFish,0,20)||p.boatDepartAt!==undefined&&!finite(p.boatDepartAt,0,s.time)||p.boatReturnAt!==undefined&&!finite(p.boatReturnAt,0,1e9)||p.boatTargetX!==undefined&&!finite(p.boatTargetX,-EXTENT/2,EXTENT/2)||p.boatTargetZ!==undefined&&!finite(p.boatTargetZ,-EXTENT/2,EXTENT/2)||p.boatSchoolId!==undefined&&!integer(p.boatSchoolId,1,8)))fail();
     if(p.kind==='temple'&&!integer(p.offerings,0,50))fail();
     if(p.kind==='slaughterhouse'&&(!integer(p.livestock,p.stage==='complete'?2:0,4)||typeof p.rearing!=='boolean'||!finite(p.rearingProgress,0,1)||!integer(p.processed)))fail();
     if(p.farmerId!==undefined&&p.farmerId!==null&&(p.kind!=='farm'||!workerIds.has(p.farmerId as number)))fail();
@@ -125,6 +128,7 @@ export function decodeSave(raw:string):IslandSave{
     if(!record(n)||!['wood','forage'].includes(n.kind as string)||!finite(n.capacity,1,1000)||!finite(n.stock,0,n.capacity as number)||!finite(n.regrowth,0,1e6)||typeof n.valid!=='boolean'||!(n.claimedBy===null||workerIds.has(n.claimedBy as number)))return fail();
   }
   for(const t of trails)if(!record(t)||!point(t)||!finite(t.wear,0,1))fail();
+  const schoolIds=new Set<number>();for(const f of fishSchools){if(!record(f)||!point(f)||!integer(f.id,1,8)||schoolIds.has(f.id)||!integer(f.visits,0,10)||!finite(f.regenAt,0,1e9))fail();schoolIds.add(f.id);}
   if(s.prayer!==null){
     const p=s.prayer;if(!record(p)||!integer(p.id,1)||!['shelter','food','water','ground'].includes(p.kind as string)||!finite(p.opened,0,1e9)||!finite(p.settled,0,3))return fail();
   }
@@ -149,7 +153,8 @@ export function decodeSave(raw:string):IslandSave{
     if((job.kind==='wood'||job.kind==='forage')&&target.kind!==job.kind)fail();
     if(job.kind==='worship'&&(target.kind!=='temple'||target.stage!=='complete'))fail();
     if(job.kind==='butcher'&&(target.kind!=='slaughterhouse'||target.stage!=='complete'))fail();
-    if((job.kind==='build'||job.kind==='supply')&&target.stage!=='building'&&!target.upgrading)fail();
+    if(job.kind==='unload-boat'&&(target.kind!=='dock'||target.stage!=='complete'||target.boatState!=='docked'))fail();
+    if((job.kind==='build'||job.kind==='supply')&&target.stage!=='building'&&!target.upgrading&&!(job.kind==='build'&&target.kind==='dock'&&target.boatState==='building'))fail();
     if((job.kind==='plant'||job.kind==='harvest')&&(target.kind!=='farm'||target.stage!=='complete'))fail();
   }
   for(const n of [...plots,...resources]){
