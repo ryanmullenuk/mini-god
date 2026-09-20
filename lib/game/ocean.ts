@@ -63,14 +63,39 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       vec2 warp=vec2(noise(p*.037+drift),noise(p*.043-drift+19.));
       float broad=noise(p*.13+warp*2.4+drift);
       float swell=sin(dot(p,vec2(.31,.19))+warp.x*5.+time*.31);
-      colour*=.96+.055*broad+.014*swell;
-      // Broad painted light, not high-frequency specular or glitter.
-      vec3 normal=normalize(vec3(.055*cos(p.x*.055+warp.x*3.+time*.24),1.,.045*sin(p.y*.064+warp.y*3.-time*.19)));
+      // Fine crossed ripples deepen the troughs without adding a normal-map
+      // texture or another reflection pass. The two different directions keep
+      // the water organic while remaining stable at distant camera zooms.
+      float phaseA=dot(p,vec2(1.08,.46))+time*.58+warp.x*5.2;
+      float phaseB=dot(p,vec2(-.38,1.31))-time*.43+warp.y*4.4;
+      float phaseC=dot(p,vec2(.61,-.27))+time*.27+broad*4.1;
+      float rippleA=sin(phaseA),rippleB=sin(phaseB),rippleC=sin(phaseC);
+      float trough=(1.-rippleA)*.5*(.42+.58*(1.-rippleB)*.5);
+      colour*=.94+.06*broad+.018*swell-.022*trough;
+      // Analytic wave slopes make the sunlight break into the long silver
+      // strokes seen on wind-ruffled ocean, rather than one smooth highlight.
+      vec2 slope=vec2(1.08,.46)*cos(phaseA)*.075
+        +vec2(-.38,1.31)*cos(phaseB)*.058
+        +vec2(.61,-.27)*cos(phaseC)*.047;
+      slope+=vec2(.055*cos(p.x*.055+warp.x*3.+time*.24),.045*sin(p.y*.064+warp.y*3.-time*.19));
+      vec3 normal=normalize(vec3(-slope.x,1.,-slope.y));
       vec3 halfLight=normalize(sunDirection+viewDirection);
-      float glint=pow(max(0.,dot(normal,halfLight)),7.);
-      float lightPower=mix(.025,.075,sunStrength);
+      float facing=max(0.,dot(normal,halfLight));
+      float softReflection=pow(facing,18.);
+      float sharpReflection=pow(facing,70.);
+      // A wide, feathered sun road concentrates the brightest broken strokes
+      // while leaving small reflections across the rest of the open water.
+      vec2 sunAxis=normalize(sunDirection.xz+vec2(.0001));
+      float across=dot(p,vec2(-sunAxis.y,sunAxis.x));
+      float sunRoad=.18+.82*exp(-across*across/2500.);
+      float ridge=smoothstep(.42,.98,rippleA)
+        *(.28+.72*smoothstep(-.32,.82,rippleB+broad*.34));
+      float glint=(softReflection*.22+sharpReflection*(.72+1.35*ridge))*sunRoad;
+      float lightPower=mix(.045,.72,sunStrength);
       colour*=daylightTint;
-      colour+=sunColour*glint*lightPower*(.85+.15*broad)*(.92+.08*swell);
+      colour+=sunColour*glint*lightPower*(.72+.28*broad)*(.90+.10*swell);
+      float silverStrokes=ridge*(.22+.78*softReflection)*sunRoad*smoothstep(.18,1.15,depth);
+      colour+=sunColour*silverStrokes*sunStrength*.075*(.76+.24*broad);
       // The wave wash is tied to actual submerged height, including sculpted bays.
       float shore=texture2D(shoreMap,clamp(uv,0.,1.)).r;
       float coastVariation=noise(p*.055)*.18;
