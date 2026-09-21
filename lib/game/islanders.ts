@@ -34,7 +34,17 @@ function skinGeometry(source:THREE.BufferGeometry,female:boolean){
 function rigAsset(scene:THREE.Object3D,female:boolean):RigAsset{
  let source:THREE.Mesh|null=null;scene.traverse(object=>{if(!source&&object instanceof THREE.Mesh)source=object;});
  if(!source)throw new Error('Islander model contains no mesh');
- return {geometry:skinGeometry((source as THREE.Mesh).geometry,female),material:(source as THREE.Mesh).material};
+ const geometry=(source as THREE.Mesh).geometry.clone();geometry.computeBoundingBox();
+ const bounds=geometry.boundingBox;
+ // Meshy's biped uses a ground-based 0–1.7 m bind pose. The existing female
+ // asset is centred around the origin. Normalise only the new male before
+ // assigning the shared lightweight gameplay skeleton so every male retains
+ // bending hips, knees, shoulders and elbows without one mixer per islander.
+ if(!female&&bounds&&bounds.min.y>-.1&&bounds.max.y>1.2){
+  const scale=1.9/(bounds.max.y-bounds.min.y),centre=bounds.getCenter(new THREE.Vector3());
+  geometry.scale(scale,scale,scale);geometry.translate(-centre.x*scale,-centre.y*scale,-centre.z*scale);
+ }
+ return {geometry:skinGeometry(geometry,female),material:(source as THREE.Mesh).material};
 }
 function loadIslanderModels(){
  if(!modelCache){
