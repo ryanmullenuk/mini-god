@@ -6,14 +6,17 @@ import type { Settlement } from './settlement';
 import type { Plot, Resource } from './world-state';
 
 type PlotVisual={root:THREE.Group;building:THREE.Group;boat:THREE.Group;crops:THREE.Group;outline:THREE.Group;supplies:THREE.Group;animals:THREE.Group;offering:THREE.Mesh;previousOfferings:number;collectedUntil:number};
+type NodeVisual={root:THREE.Group;crown:THREE.Group;previousStock:number;fallStarted:number};
 export class SettlementView {
   group=new THREE.Group();
   private plots=new Map<number,PlotVisual>();
-  private nodes=new Map<number,{root:THREE.Group;crown:THREE.Group}>();
+  private nodes=new Map<number,NodeVisual>();
   private orders=new Map<number,THREE.Group>();
   private opportunities=new THREE.Group();
   private influence=new THREE.Group();
   private fishShadows:THREE.InstancedMesh;
+  private direction=new THREE.Group();
+  private selectedPlot:number|null=null;
   private influenceKey='';
   private camp=new THREE.Group();
   private beacon=new THREE.Group();
@@ -25,7 +28,10 @@ export class SettlementView {
   private fireLights=Array.from({length:12},()=>new THREE.PointLight('#ffae51',0,14,1.65));
   constructor(private terrain:Terrain){
     this.group.add(...this.fireLights);
-    this.group.add(this.camp,this.opportunities,this.beacon,this.influence);
+    this.group.add(this.camp,this.opportunities,this.beacon,this.influence,this.direction);
+    const arrowMaterial=new THREE.MeshBasicMaterial({color:'#ffe082',transparent:true,opacity:.92,depthWrite:false,toneMapped:false});
+    const shaft=new THREE.Mesh(new THREE.BoxGeometry(.10,.05,1.15),arrowMaterial);shaft.position.z=.72;this.direction.add(shaft);
+    const head=new THREE.Mesh(new THREE.ConeGeometry(.30,.62,3),arrowMaterial);head.rotation.x=Math.PI/2;head.position.z=1.48;this.direction.add(head);this.direction.visible=false;this.direction.renderOrder=8;
     const fishShape=new THREE.Shape();fishShape.moveTo(-.24,0);fishShape.quadraticCurveTo(0,.15,.28,0);fishShape.quadraticCurveTo(0,-.15,-.24,0);fishShape.lineTo(-.42,.16);fishShape.lineTo(-.4,-.16);fishShape.closePath();
     const fishGeometry=new THREE.ShapeGeometry(fishShape);fishGeometry.rotateX(-Math.PI/2);
     this.fishShadows=new THREE.InstancedMesh(fishGeometry,new THREE.MeshBasicMaterial({color:'#07374c',transparent:true,opacity:.44,depthWrite:false}),288);this.fishShadows.frustumCulled=false;this.fishShadows.renderOrder=4;this.group.add(this.fishShadows);
@@ -82,6 +88,9 @@ export class SettlementView {
       const float=this.mesh(boat,new THREE.SphereGeometry(.17,7,3),'#a96c36',-1.0,.28,2.45);float.scale.set(.65,.42,4.6);
       for(const z of [1.75,2.45,3.15])this.box(boat,1.95,.055,.07,'#81532f',-.38,.48,z);
       this.box(boat,.52,.26,.42,'#76502f',.13,.66,2.72);
+      this.mesh(boat,new THREE.CylinderGeometry(.025,.035,1.35,7),'#76502f',0,1.12,2.45);
+      const sailShape=new THREE.Shape();sailShape.moveTo(.02,0);sailShape.lineTo(.02,1.05);sailShape.lineTo(.72,.08);sailShape.closePath();
+      const sail=new THREE.Mesh(new THREE.ShapeGeometry(sailShape),new THREE.MeshLambertMaterial({color:'#f3dfb0',side:THREE.DoubleSide,flatShading:true}));sail.position.set(.04,.63,2.45);sail.castShadow=true;boat.add(sail);
       for(let i=0;i<5;i++){const fish=this.mesh(boat,new THREE.IcosahedronGeometry(.055,0),'#a6b8b5',-.18+i*.09,.84,2.72);fish.scale.z=1.8;}
       const model=new THREE.Group();while(boat.children.length){const child=boat.children[0];child.position.z-=2.45;model.add(child);}
       const wake=new THREE.Group();wake.name='wake';
@@ -207,11 +216,19 @@ export class SettlementView {
       this.mesh(crown,new THREE.IcosahedronGeometry(.48,1),'#729054',0,.38,0);
       for(let i=0;i<7;i++){const a=i*2.4;this.mesh(crown,new THREE.IcosahedronGeometry(.08,0),'#d2a766',Math.sin(a)*.38,.52+Math.cos(i)*.1,Math.cos(a)*.35);}
     }
-    this.group.add(root);const v={root,crown};this.nodes.set(n.id,v);return v;
+    this.group.add(root);const v={root,crown,previousStock:n.stock,fallStarted:-1};this.nodes.set(n.id,v);return v;
+  }
+  selectPlot(id:number|null){this.selectedPlot=id;this.direction.visible=id!==null;}
+  pickPlot(ray:THREE.Raycaster){
+    const hit=ray.intersectObjects([...this.plots.values()].map(v=>v.root),true)[0];if(!hit)return null;
+    let root:THREE.Object3D=hit.object;while(root.parent&&root.parent!==this.group)root=root.parent;
+    for(const [id,v] of this.plots)if(v.root===root)return id;return null;
   }
   terrainChanged(){this.opportunityKey='';this.influenceKey='';}
   update(sim:Settlement,showPlots:boolean,showInfluence=false){
     const s=sim.state;
+    const selected=this.selectedPlot===null?null:s.plots.find(p=>p.id===this.selectedPlot&&p.valid&&p.stage==='complete');
+    this.direction.visible=!!selected;if(selected){this.direction.position.set(selected.x,this.terrain.height(selected.x,selected.z)+.12,selected.z);this.direction.rotation.y=selected.rotation??0;}
     let fishIndex=0;
     for(const school of s.fishSchools)for(let i=0;i<40;i++){
       const phase=s.time*.42+school.id*.83,a=i*2.399963+school.id*.71+Math.sin(phase*.37+i*.13)*.18,r=.55+(i%10)*.27,active=school.visits<10;
@@ -324,7 +341,9 @@ export class SettlementView {
       v.outline.visible=!p.valid||p.stage==='building'||!!p.upgrading;v.crops.visible=p.valid&&p.planted;
       for(const crop of v.crops.children)crop.scale.setScalar(.14+p.crop*.86);
     }
-    for(const n of s.resources){const v=this.nodes.get(n.id)??this.makeNode(n);v.root.visible=n.valid;v.root.position.set(n.x,this.terrain.height(n.x,n.z),n.z);v.crown.scale.setScalar(.25+.75*n.stock/n.capacity);}
+    for(const n of s.resources){const v=this.nodes.get(n.id)??this.makeNode(n);if(n.kind==='wood'&&n.stock<v.previousStock)v.fallStarted=s.time;v.previousStock=n.stock;
+      const fall=v.fallStarted<0?0:THREE.MathUtils.clamp((s.time-v.fallStarted)/1.35,0,1),reset=fall>=1&&s.time-v.fallStarted>1.8;
+      if(reset)v.fallStarted=-1;v.root.visible=n.valid&&!(fall>=1&&!reset);v.root.position.set(n.x,this.terrain.height(n.x,n.z),n.z);v.root.rotation.z=n.kind==='wood'&&!reset?fall*1.48:0;v.crown.scale.setScalar(.25+.75*n.stock/n.capacity);}
     const key=sim.opportunities.map(p=>`${p.kind}:${p.x},${p.z}`).join('|');
     if(key!==this.opportunityKey){
       this.opportunityKey=key;this.clearGeometry(this.opportunities);

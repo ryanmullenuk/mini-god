@@ -337,7 +337,7 @@ export function tropicalArchipelagoHeight(x:number,z:number){
   let h=archipelagoHeight(x,z);
   // Broad overlapping lobes produce the irregular, substantial main island:
   // long beaches around the outside and several village-sized interior plains.
-  for(const lobe of [{x:-43,z:-2,rx:67,rz:55},{x:38,z:4,rx:70,rz:58},{x:-2,z:38,rx:58,rz:42}]){
+  for(const lobe of [{x:-43,z:-2,rx:75,rz:62},{x:38,z:4,rx:78,rz:65},{x:-2,z:38,rx:66,rz:49}]){
     const u=(x-lobe.x)/lobe.rx,v=(z-lobe.z)/lobe.rz,a=Math.atan2(v,u);
     const d=Math.hypot(u,v)*(1+.065*Math.sin(a*5+.4)+.035*Math.cos(a*7));
     if(d<1.2)h=Math.max(h,Math.min(3.5+(1-d)*17,6.35+.16*Math.sin(x*.06)*Math.cos(z*.05)));

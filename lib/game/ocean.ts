@@ -55,6 +55,15 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       colour=mix(colour,vec3(.055,.60,.64),smoothstep(.12,.55,waterDepth));
       colour=mix(colour,vec3(.015,.32,.48),smoothstep(.45,1.15,waterDepth));
       colour=mix(colour,vec3(.006,.055,.20),smoothstep(1.0,2.1,waterDepth));
+      // Broad, irregular abyssal bands and soft basin shadows remain visible
+      // beyond the turquoise shelf. Multiple warped scales avoid contour-like
+      // repetition while giving the deep ocean readable depth.
+      float deepMask=smoothstep(1.15,2.8,waterDepth);
+      vec2 basinWarp=vec2(noise(p*.019+11.),noise(p*.023-17.));
+      float basin=noise(p*.032+basinWarp*3.8);
+      float trench=noise(vec2(dot(p,vec2(.021,.012)),dot(p,vec2(-.009,.027)))+basinWarp*2.2);
+      colour=mix(colour,vec3(.004,.035,.135),deepMask*smoothstep(.38,.82,basin)*.30);
+      colour+=vec3(.008,.055,.075)*deepMask*(trench-.5)*.34;
       float reef=smoothstep(.58,.78,noise(p*.83+noise(p*.19)*3.));
       float reefDepth=smoothstep(.2,.55,depth)*(1.-smoothstep(1.1,1.65,depth))*inside;
       colour=mix(colour,vec3(.035,.28,.30),reef*reefDepth*.48);
