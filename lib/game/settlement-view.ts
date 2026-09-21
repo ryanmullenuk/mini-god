@@ -214,8 +214,9 @@ export class SettlementView {
     const s=sim.state;
     let fishIndex=0;
     for(const school of s.fishSchools)for(let i=0;i<40;i++){
-      const a=i*2.399963+school.id*.71,r=.55+(i%10)*.27,active=school.visits<10;
-      this.dummy.position.set(school.x+Math.sin(a)*r,SEA+.025,school.z+Math.cos(a)*r);this.dummy.rotation.set(0,a+Math.sin(i)*.35,0);this.dummy.scale.setScalar(active?1.05+((i*13)%7)*.10:0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex++,this.dummy.matrix);
+      const phase=s.time*.42+school.id*.83,a=i*2.399963+school.id*.71+Math.sin(phase*.37+i*.13)*.18,r=.55+(i%10)*.27,active=school.visits<10;
+      const swim=Math.sin(phase+i*.19)*.22,driftX=Math.sin(phase*.18+school.id)*.75,driftZ=Math.cos(phase*.15+school.id*.7)*.62;
+      this.dummy.position.set(school.x+driftX+Math.sin(a)*r+Math.sin(a+Math.PI/2)*swim,SEA+.025,school.z+driftZ+Math.cos(a)*r+Math.cos(a+Math.PI/2)*swim);this.dummy.rotation.set(0,a+Math.sin(phase+i*.27)*.42,0);this.dummy.scale.setScalar(active?1.05+((i*13)%7)*.10:0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex++,this.dummy.matrix);
     }
     for(;fishIndex<288;fishIndex++){this.dummy.scale.setScalar(0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex,this.dummy.matrix);}
     this.fishShadows.instanceMatrix.needsUpdate=true;
@@ -270,11 +271,13 @@ export class SettlementView {
           model.scale.setScalar(boat.state==='building'?.18+.82*boat.progress:1);let x=0,z=0;
           let moving=false;
           if(boat.state==='at-sea'&&boat.targetX!==undefined&&boat.targetZ!==undefined){
-            const arrive=boat.arriveAt??boat.departAt,fishUntil=boat.fishUntil??boat.returnAt,theta=v.root.rotation.y,dx=boat.targetX-p.x,dz=boat.targetZ-p.z,targetX=Math.cos(theta)*dx-Math.sin(theta)*dz,targetZ=Math.sin(theta)*dx+Math.cos(theta)*dz,startZ=2.45;
+            const arrive=boat.arriveAt??boat.departAt,fishUntil=boat.fishUntil??boat.returnAt,theta=v.root.rotation.y,dx=boat.targetX-p.x,dz=boat.targetZ-p.z,targetX=Math.cos(theta)*dx-Math.sin(theta)*dz,targetZ=Math.sin(theta)*dx+Math.cos(theta)*dz,lx=(boat.launchX??p.x)-p.x,lz=(boat.launchZ??p.z)-p.z,launchX=Math.cos(theta)*lx-Math.sin(theta)*lz,launchZ=Math.sin(theta)*lx+Math.cos(theta)*lz,startZ=2.45;
             let travel=1,forward=true;
             if(s.time<arrive){travel=THREE.MathUtils.clamp((s.time-boat.departAt)/Math.max(.001,arrive-boat.departAt),0,1);moving=true;}
             else if(s.time>=fishUntil){travel=1-THREE.MathUtils.clamp((s.time-fishUntil)/Math.max(.001,boat.returnAt-fishUntil),0,1);moving=true;forward=false;}
-            x=targetX*travel;z=startZ+(targetZ-startZ)*travel;
+            const launchEnd=.16;
+            if(travel<launchEnd){const t=travel/launchEnd;x=THREE.MathUtils.lerp(0,launchX,t);z=THREE.MathUtils.lerp(startZ,launchZ,t);}
+            else{const t=(travel-launchEnd)/(1-launchEnd),bend=Math.sin(t*Math.PI)*(i%2?.9:-.9);x=THREE.MathUtils.lerp(launchX,targetX,t)+bend;z=THREE.MathUtils.lerp(launchZ,targetZ,t);}
             if(!moving){x+=Math.sin(s.time*.45+i)*.32;z+=Math.cos(s.time*.38+i)*.24;}
             const heading=Math.atan2(targetX,(targetZ-startZ));model.rotation.y=(forward?heading:heading+Math.PI);
           }else if(boat.state==='docked'){

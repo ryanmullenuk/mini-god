@@ -372,6 +372,10 @@ export function tropicalArchipelagoHeight(x:number,z:number){
   }
   // Existing pools remain open even at the foot of a new ridge.
   for(const pool of POOLS){const d=Math.hypot((x-pool.x)/pool.rx,(z-pool.z)/pool.rz);if(d<1.5)h=Math.min(h,1.15+2.12*d*d);}
+  // Keep the island wholly inside the editable world. This deep-water border
+  // prevents contour meshes ending in a straight, visibly clipped wall.
+  const edge=EXTENT/2-Math.max(Math.abs(x),Math.abs(z));
+  if(edge<13)h=THREE.MathUtils.lerp(-2,h,THREE.MathUtils.smoothstep(edge,2.5,13));
   return Math.min(16.3,h);
 }
 /** Vegetation regions are separate from historical terrain palettes/save baselines. */

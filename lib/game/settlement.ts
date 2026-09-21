@@ -59,15 +59,25 @@ export class Settlement {
     }
     return true;
   }
+  private boatRoute(p:Point,school:Point){
+    const candidates:Point[]=[];
+    for(let radius=2;radius<=12;radius+=1)for(let i=0;i<32;i++){
+      const angle=i/32*Math.PI*2,x=p.x+Math.sin(angle)*radius,z=p.z+Math.cos(angle)*radius;
+      if(Math.abs(x)>=EXTENT/2-2||Math.abs(z)>=EXTENT/2-2||this.terrain.height(x,z)>SEA-.08)continue;
+      candidates.push({x,z});
+    }
+    candidates.sort((a,b)=>distance(p,a)-distance(p,b));
+    return candidates.find(point=>this.clearSeaRoute(point,school))??null;
+  }
   private sendBoat(p:WorldState['plots'][number],boat:FishingBoat){
-    let choices=this.state.fishSchools.filter(s=>s.visits<10).filter(s=>this.clearSeaRoute(p,s));
-    const alternatives=choices.filter(s=>s.id!==boat.schoolId);if(alternatives.length)choices=alternatives;
+    let choices=this.state.fishSchools.filter(s=>s.visits<10).map(s=>({school:s,launch:this.boatRoute(p,s)})).filter((entry):entry is {school:WorldState['fishSchools'][number];launch:Point}=>!!entry.launch);
+    const alternatives=choices.filter(({school})=>school.id!==boat.schoolId);if(alternatives.length)choices=alternatives;
     const occupied=new Set(this.state.plots.flatMap(plot=>(plot.boats??[]).filter(other=>other!==boat&&other.state==='at-sea').map(other=>other.schoolId)));
-    const open=choices.filter(s=>!occupied.has(s.id));if(open.length)choices=open;
-    const school=choices[Math.floor(this.random()*choices.length)];
-    if(!school)return false;
+    const open=choices.filter(({school})=>!occupied.has(school.id));if(open.length)choices=open;
+    const selected=choices[Math.floor(this.random()*choices.length)];
+    if(!selected)return false;const {school,launch}=selected;
     const travel=Math.max(14,Math.min(35,distance(p,school)/2.8)),fishing=120+this.random()*180;
-    boat.state='at-sea';boat.departAt=this.state.time;boat.arriveAt=this.state.time+travel;boat.fishUntil=boat.arriveAt+fishing;boat.returnAt=boat.fishUntil+travel;boat.targetX=school.x;boat.targetZ=school.z;boat.schoolId=school.id;
+    boat.state='at-sea';boat.departAt=this.state.time;boat.arriveAt=this.state.time+travel;boat.fishUntil=boat.arriveAt+fishing;boat.returnAt=boat.fishUntil+travel;boat.targetX=school.x;boat.targetZ=school.z;boat.launchX=launch.x;boat.launchZ=launch.z;boat.schoolId=school.id;
     this.event('The fishing boat has set sail for a deep-water fish school.');return true;
   }
   private event(message:string){this.state.lastEvent=message;this.state.eventTime=this.state.time;}
