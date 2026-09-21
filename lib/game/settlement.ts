@@ -32,6 +32,9 @@ export class Settlement {
   constructor(readonly terrain:Terrain,state?:WorldState,createWaterWorker?:()=>Worker){
     this.state=state??newWorld();this.state.fishSchools??=[];
     for(const p of this.state.plots)if(p.kind==='dock'&&!p.boats){p.boats=p.boatState&&p.boatState!=='none'?[{state:p.boatState,progress:p.boatProgress??0,returnAt:p.boatReturnAt??0,departAt:p.boatDepartAt??0,trips:p.boatTrips??0,fish:p.boatFish??0,targetX:p.boatTargetX,targetZ:p.boatTargetZ,schoolId:p.boatSchoolId}]:[];}
+    for(const p of this.state.plots)for(const boat of p.boats??[])if(boat.state==='at-sea'){
+      const travel=Math.max(8,Math.min(35,(boat.returnAt-boat.departAt)/2));boat.arriveAt??=boat.departAt+travel;boat.fishUntil??=Math.max(boat.arriveAt,boat.returnAt-travel);
+    }
     this.seedFishSchools();this.metadata=new TerrainMetadata(terrain,undefined,createWaterWorker);
     this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='dock'&&p.valid&&Math.abs(x-p.x)<(p.kind==='farm'?1.75:1.32)&&Math.abs(z-p.z)<(p.kind==='farm'?1.75:1.32)));
     this.foodSystem=new FoodSystem(()=>this.state,terrain,this.nav,(w,k,id,p)=>this.assign(w,k,id,p),w=>this.release(w));
@@ -57,9 +60,14 @@ export class Settlement {
     return true;
   }
   private sendBoat(p:WorldState['plots'][number],boat:FishingBoat){
-    const school=this.state.fishSchools.filter(s=>s.visits<10).filter(s=>this.clearSeaRoute(p,s)).sort((a,b)=>distance(p,a)-distance(p,b))[0];
+    let choices=this.state.fishSchools.filter(s=>s.visits<10).filter(s=>this.clearSeaRoute(p,s));
+    const alternatives=choices.filter(s=>s.id!==boat.schoolId);if(alternatives.length)choices=alternatives;
+    const occupied=new Set(this.state.plots.flatMap(plot=>(plot.boats??[]).filter(other=>other!==boat&&other.state==='at-sea').map(other=>other.schoolId)));
+    const open=choices.filter(s=>!occupied.has(s.id));if(open.length)choices=open;
+    const school=choices[Math.floor(this.random()*choices.length)];
     if(!school)return false;
-    boat.state='at-sea';boat.departAt=this.state.time;boat.returnAt=this.state.time+60;boat.targetX=school.x;boat.targetZ=school.z;boat.schoolId=school.id;
+    const travel=Math.max(14,Math.min(35,distance(p,school)/2.8)),fishing=120+this.random()*180;
+    boat.state='at-sea';boat.departAt=this.state.time;boat.arriveAt=this.state.time+travel;boat.fishUntil=boat.arriveAt+fishing;boat.returnAt=boat.fishUntil+travel;boat.targetX=school.x;boat.targetZ=school.z;boat.schoolId=school.id;
     this.event('The fishing boat has set sail for a deep-water fish school.');return true;
   }
   private event(message:string){this.state.lastEvent=message;this.state.eventTime=this.state.time;}
@@ -359,9 +367,6 @@ export class Settlement {
     if(w.cargo.construction){const p=this.state.plots.find(p=>p.id===w.cargo.construction!.site);if(p&&p.valid&&p.claimedBy===null)this.assign(w,'supply',p.id,workPoint(p));return;}
     if(w.cargo.animal){this.foodSystem.decide(w);return;}
     if(w.cargo.wood+w.cargo.food>0){this.deliver(w);return;}
-    if(this.state.plots.some(p=>p.kind==='granary'&&p.valid&&p.stage==='complete'))for(const p of this.state.plots.filter(p=>p.kind==='dock'&&p.valid&&p.stage==='complete'&&(p.boats??[]).some(b=>b.state==='docked'&&b.fish>0))){
-      const reserved=new Set(this.state.settlers.filter(a=>a.job?.kind==='unload-boat'&&a.job.target===p.id).map(a=>a.job!.destination)),index=(p.boats??[]).findIndex((b,i)=>b.state==='docked'&&b.fish>0&&!reserved.has(i)),route=index<0?null:this.nav.route(w,workPoint(p));if(route){w.job={kind:'unload-boat',target:p.id,route,work:0,destination:index};return;}
-    }
     const hungry=this.state.food<this.state.settlers.length*3;
     if(hungry&&this.resourceJob(w,'forage'))return;
     const clearing=this.state.orders.find(o=>this.insideSite(w,o)&&this.state.wood>=BUILD_COST[o.kind]);
@@ -437,12 +442,7 @@ export class Settlement {
       this.release(w);return;
     }
     const p=this.state.plots.find(p=>p.id===job.target);
-    if(job.kind==='unload-boat'){
-      const boat=p?.boats?.[job.destination??-1];if(p?.kind!=='dock'||!boat||boat.state!=='docked'||boat.fish<=0){this.release(w);return;}
-      const amount=Math.min(10,boat.fish);boat.fish-=amount;w.cargo.food+=amount;w.cargo.boatFish=(w.cargo.boatFish??0)+amount;
-      if(boat.fish<=0)this.sendBoat(p,boat);
-      this.release(w);return;
-    }
+    if(job.kind==='unload-boat'){this.release(w);return;}
     if(!p||!p.valid||p.claimedBy!==w.id){this.release(w);return;}
     if(job.kind==='supply'){
       if(w.cargo.construction){
@@ -564,8 +564,14 @@ export class Settlement {
       if(boat.state==='at-sea'&&s.time>=boat.returnAt){
         const school=s.fishSchools.find(a=>a.id===boat.schoolId);if(school){school.visits=Math.min(10,school.visits+1);if(school.visits>=10&&!school.regenAt)school.regenAt=s.time+3600;}
         boat.fish=20;boat.trips++;boat.state='docked';
-        this.event('A fishing boat joined the dock queue with 20 fish. Villagers will carry them to a granary.');
+        this.event('A fishing boat returned with 20 fish. The dock will unload it into a granary.');
       }
+    }
+    const hasGranary=s.plots.some(p=>p.kind==='granary'&&p.valid&&p.stage==='complete');
+    if(hasGranary)for(const p of s.plots)if(p.kind==='dock'&&p.valid&&p.stage==='complete')for(const boat of p.boats??[])if(boat.state==='docked'&&boat.fish>0){
+      const amount=Math.min(boat.fish,Math.max(0,this.storage.food-s.food));
+      if(amount>0){boat.fish-=amount;s.food+=amount;s.deliveredFood+=amount;this.event(`${amount} fish unloaded automatically into village reserves.`);}
+      if(boat.fish<=0)this.sendBoat(p,boat);
     }
     for(const p of s.plots)if(p.kind==='farm'&&p.valid){
       p.moisture=Math.max(0,Math.min(1,p.moisture+dt*(this.wetAt(p)?.025:-(.0017+desertWeight(p.x,p.z)*.0015))));
@@ -591,7 +597,7 @@ export class Settlement {
       for(const w of s.settlers)this.decide(w);
     }
     if(s.tick%2400===1&&s.settlers.length<Math.min(V.maxPopulation,this.capacity)&&s.food>=s.settlers.length*5+6)this.add(1,undefined,false);
-    for(const w of s.settlers){w.moving=false;if(w.job?.kind==='gather'&&(!evening(s.time)||s.food<s.settlers.length*3||s.orders.length>0||!s.plots.some(p=>p.id===w.job!.target&&p.valid&&p.stage==='complete')))this.release(w);if(w.stranded)continue;this.foodSystem.beforeWalk(w);this.walk(w,dt);this.work(w,dt);}
+    for(const w of s.settlers){w.moving=false;if(w.job?.kind==='unload-boat')this.release(w);if(w.job?.kind==='gather'&&(!evening(s.time)||s.food<s.settlers.length*3||s.orders.length>0||!s.plots.some(p=>p.id===w.job!.target&&p.valid&&p.stage==='complete')))this.release(w);if(w.stranded)continue;this.foodSystem.beforeWalk(w);this.walk(w,dt);this.work(w,dt);}
     this.prayers(dt);
   }
   private buildingMessage(p:WorldState['plots'][number]){

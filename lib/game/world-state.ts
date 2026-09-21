@@ -31,7 +31,7 @@ export type Settler = Point & {
   lastGather?: number; lastWorship?: number; huntingSkill?:number; weapon?:boolean;
   job: Job | null; cargo: { wood: number; food: number; harvest: number; boatFish?:number; animal?: {species:Species;destination:number}; feed?:number; construction?:{site:number;wood:number} };
 };
-export type FishingBoat = {state:'building'|'at-sea'|'docked';progress:number;returnAt:number;departAt:number;trips:number;fish:number;targetX?:number;targetZ?:number;schoolId?:number};
+export type FishingBoat = {state:'building'|'at-sea'|'docked';progress:number;returnAt:number;departAt:number;arriveAt?:number;fishUntil?:number;trips:number;fish:number;targetX?:number;targetZ?:number;schoolId?:number};
 export type Plot = Point & {
   id: number; kind: BuildKind; stage: 'building' | 'complete'; progress: number; rotation?: number;
   valid: boolean; claimedBy: number | null; moisture: number; fertility: number;

@@ -61,7 +61,7 @@ test('a requested farm takes priority over the automatic hut and only spends its
     conserved(sim,6);
   }finally{terrain.dispose();}
 });
-test('boats fish deep-water schools and villagers unload the catch into a granary',()=>{
+test('boats take varied 2-5 minute trips and automatically unload into a granary',()=>{
   const terrain=new Terrain();try{
     const sim=new Settlement(terrain);sim.add(2);sim.state.wood=80;sim.state.food=200;
     let shore=null;for(let z=-95;z<=95&&!shore;z+=2)for(let x=-95;x<=95;x+=2){const preview=sim.guidancePreview('dock',{x,z});if(preview.allowed){shore={x,z};break;}}
@@ -69,10 +69,12 @@ test('boats fish deep-water schools and villagers unload the catch into a granar
     for(let i=0;i<9000&&!sim.state.plots.some(p=>p.kind==='dock'&&p.stage==='complete');i++)sim.advance(.1);
     const dock=sim.state.plots.find(p=>p.kind==='dock');assert.equal(dock?.stage,'complete',JSON.stringify({dock,workers:sim.state.settlers.map(w=>w.job)}));assert.deepEqual(dock.boats,[]);
     for(let i=0;i<5;i++)assert.ok(sim.buildBoat(dock.id));assert.equal(sim.buildBoat(dock.id),false);run(sim,25);assert.equal(dock.boats[0].state,'at-sea');assert.ok(dock.boats[0].schoolId);const before=sim.state.deliveredFood;
-    run(sim,61);assert.ok(dock.boats.some(b=>b.state==='docked'));assert.ok(dock.boats.some(b=>b.trips===1));assert.ok(dock.boats.reduce((n,b)=>n+b.fish,0)>=20);run(sim,10);assert.ok(dock.boats.reduce((n,b)=>n+b.fish,0)>=20,'Catches queue when no granary exists');
+    const sailing=dock.boats.filter(b=>b.state==='at-sea');assert.ok(sailing.length);assert.equal(new Set(sailing.map(b=>b.schoolId)).size,sailing.length);
+    for(const boat of sailing){assert.ok(boat.arriveAt>boat.departAt);assert.ok(boat.fishUntil-boat.arriveAt>=120&&boat.fishUntil-boat.arriveAt<=300);assert.ok(Math.abs((boat.arriveAt-boat.departAt)-(boat.returnAt-boat.fishUntil))<.001);}
+    run(sim,Math.ceil(Math.max(...sailing.map(b=>b.returnAt))-sim.state.time)+1);assert.ok(dock.boats.some(b=>b.state==='docked'));assert.ok(dock.boats.some(b=>b.trips===1));assert.ok(dock.boats.reduce((n,b)=>n+b.fish,0)>=20);run(sim,10);assert.ok(dock.boats.reduce((n,b)=>n+b.fish,0)>=20,'Catches queue when no granary exists');
     let store=null;for(let z=-90;z<=90&&!store;z+=2)for(let x=-90;x<=90;x+=2){const preview=sim.guidancePreview('granary',{x,z});if(preview.allowed){store={x,z};break;}}
     assert.ok(store);assert.ok(sim.guide('granary',store).allowed);for(let i=0;i<5000&&!sim.state.plots.some(p=>p.kind==='granary'&&p.stage==='complete');i++)sim.advance(.1);
-    for(let i=0;i<3000&&sim.state.deliveredFood<before+20;i++)sim.advance(.1);assert.ok(sim.state.deliveredFood>=before+20);
+    for(let i=0;i<3000&&sim.state.deliveredFood<before+20;i++)sim.advance(.1);assert.ok(sim.state.deliveredFood>=before+20);assert.ok(sim.state.settlers.every(w=>w.job?.kind!=='unload-boat'));
     const visited=sim.state.fishSchools.find(s=>s.visits>=1);assert.ok(visited);
     const regenerating=sim.state.fishSchools.find(s=>s.id!==visited.id);assert.ok(regenerating);regenerating.visits=10;regenerating.regenAt=sim.state.time+.2;run(sim,.3);assert.equal(regenerating.visits,0);
     const restored=decodeSave(encodeSave(terrain.values,sim.state,terrain.revision));assert.equal(restored.world.plots.find(p=>p.kind==='dock').boats.length,5);

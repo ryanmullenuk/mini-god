@@ -28,7 +28,7 @@ export class SettlementView {
     this.group.add(this.camp,this.opportunities,this.beacon,this.influence);
     const fishShape=new THREE.Shape();fishShape.moveTo(-.24,0);fishShape.quadraticCurveTo(0,.15,.28,0);fishShape.quadraticCurveTo(0,-.15,-.24,0);fishShape.lineTo(-.42,.16);fishShape.lineTo(-.4,-.16);fishShape.closePath();
     const fishGeometry=new THREE.ShapeGeometry(fishShape);fishGeometry.rotateX(-Math.PI/2);
-    this.fishShadows=new THREE.InstancedMesh(fishGeometry,new THREE.MeshBasicMaterial({color:'#093f57',transparent:true,opacity:.24,depthWrite:false}),144);this.fishShadows.frustumCulled=false;this.group.add(this.fishShadows);
+    this.fishShadows=new THREE.InstancedMesh(fishGeometry,new THREE.MeshBasicMaterial({color:'#07374c',transparent:true,opacity:.44,depthWrite:false}),288);this.fishShadows.frustumCulled=false;this.fishShadows.renderOrder=4;this.group.add(this.fishShadows);
     const beaconMaterial=new THREE.MeshBasicMaterial({color:'#fff0a4',transparent:true,opacity:.7,depthWrite:false});
     this.beaconGlow=new THREE.Mesh(new THREE.OctahedronGeometry(.3),beaconMaterial);this.beaconGlow.position.y=2.8;this.beacon.add(this.beaconGlow);
     const beam=new THREE.Mesh(new THREE.CylinderGeometry(.035,.13,2.5,12),new THREE.MeshBasicMaterial({color:'#fff0a4',transparent:true,opacity:.3,depthWrite:false}));beam.position.y=1.3;this.beacon.add(beam);
@@ -81,13 +81,12 @@ export class SettlementView {
       this.box(boat,.62,.10,1.55,'#c68b4d',0,.53,2.45);
       const float=this.mesh(boat,new THREE.SphereGeometry(.17,7,3),'#a96c36',-1.0,.28,2.45);float.scale.set(.65,.42,4.6);
       for(const z of [1.75,2.45,3.15])this.box(boat,1.95,.055,.07,'#81532f',-.38,.48,z);
-      this.mesh(boat,new THREE.CylinderGeometry(.035,.045,2.25,7),'#704527',0,1.62,2.45);
-      const sailShape=new THREE.Shape();sailShape.moveTo(.02,.05);sailShape.lineTo(.02,1.95);sailShape.lineTo(.92,.18);sailShape.closePath();
-      const sail=this.mesh(boat,new THREE.ShapeGeometry(sailShape),'#f0d79e',.04,.64,2.43);sail.material=this.material('#f0d79e');
-      for(const [r,y] of [[.30,1.72],[.22,1.71],[.13,1.70]] as const){const mark=this.mesh(boat,new THREE.TorusGeometry(r,.035,5,18),'#c66f3c',.40,y,2.415);mark.scale.y=.72;}
       this.box(boat,.52,.26,.42,'#76502f',.13,.66,2.72);
       for(let i=0;i<5;i++){const fish=this.mesh(boat,new THREE.IcosahedronGeometry(.055,0),'#a6b8b5',-.18+i*.09,.84,2.72);fish.scale.z=1.8;}
-      const model=new THREE.Group();while(boat.children.length)model.add(boat.children[0]);boat.add(model);for(let i=1;i<5;i++)boat.add(model.clone(true));
+      const model=new THREE.Group();while(boat.children.length){const child=boat.children[0];child.position.z-=2.45;model.add(child);}
+      const wake=new THREE.Group();wake.name='wake';
+      for(let i=0;i<7;i++){const foam=this.mesh(wake,new THREE.IcosahedronGeometry(.10+i*.018,0),i%2?'#dff7f1':'#ffffff',(i%2?1:-1)*(.18+i*.075),.08,-.58-i*.28);foam.scale.set(1.5,.18,2.4);foam.castShadow=false;foam.receiveShadow=false;}
+      wake.visible=false;model.add(wake);boat.add(model);for(let i=1;i<5;i++)boat.add(model.clone(true));
     }else if(p.kind==='home'){building.scale.setScalar(B.visuals.hut);
       this.box(building,1.85,.11,1.85,'#d7c8a5',0,.04,0);
       this.box(building,1.62,1.18,1.52,'#f1ead7',0,.67,-.08);
@@ -214,11 +213,11 @@ export class SettlementView {
   update(sim:Settlement,showPlots:boolean,showInfluence=false){
     const s=sim.state;
     let fishIndex=0;
-    for(const school of s.fishSchools)for(let i=0;i<24;i++){
-      const a=i*2.399963+school.id*.71,r=.6+(i%7)*.23,active=school.visits<10;
-      this.dummy.position.set(school.x+Math.sin(a)*r,SEA+.015,school.z+Math.cos(a)*r);this.dummy.rotation.set(0,a+Math.sin(i)*.35,0);this.dummy.scale.setScalar(active?.75+((i*13)%5)*.08:0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex++,this.dummy.matrix);
+    for(const school of s.fishSchools)for(let i=0;i<40;i++){
+      const a=i*2.399963+school.id*.71,r=.55+(i%10)*.27,active=school.visits<10;
+      this.dummy.position.set(school.x+Math.sin(a)*r,SEA+.025,school.z+Math.cos(a)*r);this.dummy.rotation.set(0,a+Math.sin(i)*.35,0);this.dummy.scale.setScalar(active?1.05+((i*13)%7)*.10:0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex++,this.dummy.matrix);
     }
-    for(;fishIndex<144;fishIndex++){this.dummy.scale.setScalar(0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex,this.dummy.matrix);}
+    for(;fishIndex<288;fishIndex++){this.dummy.scale.setScalar(0);this.dummy.updateMatrix();this.fishShadows.setMatrixAt(fishIndex,this.dummy.matrix);}
     this.fishShadows.instanceMatrix.needsUpdate=true;
     this.influence.visible=showInfluence;
     if(showInfluence){
@@ -269,12 +268,19 @@ export class SettlementView {
         v.boat.children.forEach((model,i)=>{
           const boat=boats[i];model.visible=!!boat;if(!boat)return;
           model.scale.setScalar(boat.state==='building'?.18+.82*boat.progress:1);let x=0,z=0;
+          let moving=false;
           if(boat.state==='at-sea'&&boat.targetX!==undefined&&boat.targetZ!==undefined){
-            const duration=Math.max(.001,boat.returnAt-boat.departAt),phase=THREE.MathUtils.clamp((s.time-boat.departAt)/duration,0,1),travel=Math.sin(Math.PI*phase),dx=boat.targetX-p.x,dz=boat.targetZ-p.z,theta=v.root.rotation.y;
-            x=(Math.cos(theta)*dx-Math.sin(theta)*dz)*travel;z=(Math.sin(theta)*dx+Math.cos(theta)*dz)*travel;
+            const arrive=boat.arriveAt??boat.departAt,fishUntil=boat.fishUntil??boat.returnAt,theta=v.root.rotation.y,dx=boat.targetX-p.x,dz=boat.targetZ-p.z,targetX=Math.cos(theta)*dx-Math.sin(theta)*dz,targetZ=Math.sin(theta)*dx+Math.cos(theta)*dz,startZ=2.45;
+            let travel=1,forward=true;
+            if(s.time<arrive){travel=THREE.MathUtils.clamp((s.time-boat.departAt)/Math.max(.001,arrive-boat.departAt),0,1);moving=true;}
+            else if(s.time>=fishUntil){travel=1-THREE.MathUtils.clamp((s.time-fishUntil)/Math.max(.001,boat.returnAt-fishUntil),0,1);moving=true;forward=false;}
+            x=targetX*travel;z=startZ+(targetZ-startZ)*travel;
+            if(!moving){x+=Math.sin(s.time*.45+i)*.32;z+=Math.cos(s.time*.38+i)*.24;}
+            const heading=Math.atan2(targetX,(targetZ-startZ));model.rotation.y=(forward?heading:heading+Math.PI);
           }else if(boat.state==='docked'){
-            const queue=docked.findIndex(entry=>entry.i===i);x=(queue-(docked.length-1)/2)*1.55;z=1.0+queue*.3;
-          }else{x=(i%2)*1.4-.7;z=Math.floor(i/2)*.45;}
+            const queue=docked.findIndex(entry=>entry.i===i);x=(queue-(docked.length-1)/2)*1.55;z=2.45+queue*.3;model.rotation.y=0;
+          }else{x=(i%2)*1.4-.7;z=2.45+Math.floor(i/2)*.45;model.rotation.y=0;}
+          const wake=model.getObjectByName('wake');if(wake){wake.visible=moving;wake.scale.setScalar(.9+Math.sin(s.time*8+i)*.08);wake.position.z=-.08-Math.sin(s.time*6+i)*.05;}
           model.position.set(x,Math.sin(s.time*2.2+i)*.05,z);
         });
       }
