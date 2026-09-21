@@ -51,7 +51,7 @@ test('temples are constructed at the chosen site, receive real visits and collec
 test('slaughterhouses rear goats from surplus feed, protect the breeding pair and deliver meat',()=>{
   const {terrain,sim}=flat();try{
     sim.state.wood=30;
-    for(const [kind,p] of [['home',{x:1,z:7}],['farm',{x:-5,z:8}],['slaughterhouse',{x:1,z:3}]])assert.ok(sim.guide(kind,p).allowed);
+    for(const [kind,p] of [['home',{x:1,z:7}],['farm',{x:-5,z:8}],['slaughterhouse',{x:5,z:3}]]){const preview=sim.guide(kind,p);assert.ok(preview.allowed,`${kind}: ${preview.message}`);}
     let carriedMeat=false;
     for(let i=0;i<9000;i++){sim.advance(.1);if(sim.state.settlers.some(w=>w.cargo.food===10&&w.cargo.harvest===0))carriedMeat=true;}
     const house=sim.state.plots.find(p=>p.kind==='slaughterhouse');assert.ok(house.processed>0);assert.ok(house.livestock>=2&&house.livestock<=4);assert.ok(carriedMeat);
