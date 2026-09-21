@@ -147,7 +147,7 @@ export default function Home() {
     {!population && <div className="bottom-right"><Users />Choose where your civilisation begins</div>}
 
     {(!ready||!started) && <div className="loading mini-god-splash">
-      <img className="splash-artwork" src="/polygod-splash.png" width={941} height={1672} alt="PolyGod — Build, Grow, Thrive. Islanders overlooking a tropical island village." fetchPriority="high" draggable={false}/>
+      <img className="splash-artwork" src="/polygod-splash.jpg" width={589} height={1280} alt="PolyGod — Build, Grow, Thrive. Islanders overlooking a tropical island village." fetchPriority="high" draggable={false}/>
       <div className="splash-entry">{error?<div className="error-message" role="alert">{error}</div>:<button disabled={!ready} onClick={enterWorld}>{ready?'Enter your world':'Shaping your island…'}</button>}</div>
     </div>}
     <input ref={file} hidden type="file" accept=".json,application/json" aria-label="Import island save" onChange={e => void importIsland(e.target.files?.[0])} />

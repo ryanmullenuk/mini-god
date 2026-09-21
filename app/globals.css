@@ -103,7 +103,7 @@
 
 .wordmark{font-size:32px;letter-spacing:.12em}
 .mini-god-splash{position:absolute;overflow:hidden;isolation:isolate;background:#164e4e;display:block}
-.mini-god-splash::before{content:'';position:absolute;inset:-24px;background:url('/polygod-splash.png') center/cover no-repeat;filter:blur(18px) saturate(.9) brightness(.72);transform:scale(1.05);opacity:.9}
+.mini-god-splash::before{content:'';position:absolute;inset:-24px;background:url('/polygod-splash.jpg') center/cover no-repeat;filter:blur(18px) saturate(.9) brightness(.72);transform:scale(1.05);opacity:.9}
 .splash-artwork{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;object-position:center;user-select:none;filter:drop-shadow(0 0 34px #0b354b66)}
 .splash-entry{position:absolute;z-index:1;left:0;right:0;bottom:0;display:grid;justify-items:center;align-content:center;padding:12px 20px max(16px,env(safe-area-inset-bottom));color:#fff8dc}
 .splash-entry button{border:1px solid #ffffff9c;background:#f3f2dcec;color:#24504c;border-radius:40px;padding:15px 30px;font-size:14px;min-width:180px;box-shadow:0 8px 28px #153f494d;cursor:pointer}
