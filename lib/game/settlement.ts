@@ -61,8 +61,8 @@ export class Settlement {
   }
   private boatRoute(p:Point,school:Point){
     const candidates:Point[]=[];
-    for(let radius=2;radius<=12;radius+=1)for(let i=0;i<32;i++){
-      const angle=i/32*Math.PI*2,x=p.x+Math.sin(angle)*radius,z=p.z+Math.cos(angle)*radius;
+    for(let radius=1;radius<=20;radius+=1)for(let i=0;i<64;i++){
+      const angle=i/64*Math.PI*2,x=p.x+Math.sin(angle)*radius,z=p.z+Math.cos(angle)*radius;
       if(Math.abs(x)>=EXTENT/2-2||Math.abs(z)>=EXTENT/2-2||this.terrain.height(x,z)>SEA-.08)continue;
       candidates.push({x,z});
     }
@@ -447,8 +447,10 @@ export class Settlement {
       const n=this.state.resources.find(n=>n.id===job.target);
       if(!n||!n.valid||n.claimedBy!==w.id){this.release(w);return;}
       if(job.work<5)return;
-      const amount=Math.min(job.kind==='wood'?3:4,Math.floor(n.stock));n.stock-=amount;
-      if(job.kind==='wood')w.cargo.wood+=amount;else w.cargo.food+=amount;
+      const amount=Math.min(job.kind==='wood'?3:4,Math.floor(n.stock));
+      if(job.kind==='wood'){
+        if(amount>0){n.stock=0;n.regrowth=0;n.valid=false;n.claimedBy=null;}w.cargo.wood+=amount;
+      }else{n.stock-=amount;w.cargo.food+=amount;}
       this.release(w);return;
     }
     const p=this.state.plots.find(p=>p.id===job.target);
@@ -633,11 +635,13 @@ export class Settlement {
     });
     const dockPlot=s.plots.find(p=>p.kind==='dock'&&p.valid&&p.stage==='complete'),hasStore=s.plots.some(p=>p.kind==='granary'&&p.valid&&p.stage==='complete'),boats=dockPlot?.boats??[],building=boats.find(b=>b.state==='building'),dock=dockPlot?{id:dockPlot.id,state:building?'building' as const:boats.some(b=>b.state==='docked')?'docked' as const:boats.some(b=>b.state==='at-sea')?'at-sea' as const:'none' as const,progress:building?.progress??0,trips:boats.reduce((n,b)=>n+b.trips,0),fish:boats.reduce((n,b)=>n+b.fish,0),ships:boats.length,atSea:boats.filter(b=>b.state==='at-sea').length,queued:boats.filter(b=>b.state==='docked').length,hasStore,canBuild:boats.length<5&&s.wood>=6}:null;
     const beacon=s.beacon?{id:s.beacon.id,remaining:Math.ceil(s.beacon.expires-s.time),message:`${s.beacon.members.filter(m=>m.phase==='arrived'||m.phase==='done').length}/${s.beacon.members.length} gathered · ${s.beacon.members.some(m=>m.phase==='waiting')?'Some need a route: sculpt single-layer steps':'Following your light'}`} : null;
+    const foodFull=s.food>=this.storage.food-.001,woodFull=s.wood>=this.storage.wood-.001;
+    const storagePrompt=foodFull&&woodFull?'Food and wood stores are full · build a granary and storehouse.':foodFull?'Food stores are full · build another granary.':woodFull?'Wood stores are full · build another storehouse.':'';
     return {dock,storage:this.storage,foodSystem:this.foodSystem.status(),tier:s.tier,milestone:s.tier===2?'Tier 2 · Wider temple influence and blessings':`Tier 2: ${Math.min(2,homes)}/2 huts · ${s.harvestedFood>0?'1':'0'}/1 harvest delivered · ${s.plots.some(p=>p.kind==='temple'&&p.valid&&p.stage==='complete')?'1':'0'}/1 temple`,offerings:s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').reduce((n,p)=>n+(p.offerings??0),0),temples:s.plots.filter(p=>p.kind==='temple'&&p.valid&&p.stage==='complete').length,slaughterhouses:s.plots.filter(p=>p.kind==='slaughterhouse'&&p.valid&&p.stage==='complete').length,beacon,buildings,faithMessage:this.capacity<s.settlers.length?'Build shelter for everyone to earn steady faith.':s.food<=s.settlers.length*3?'Store more food to earn steady faith.':s.faith>=500?'Faith is full. Use a blessing to help your village.':`Your cared-for village earns ${(s.settlers.length*.008*60).toFixed(1)} faith per minute.`,population:s.settlers.length,sheltered:Math.min(this.capacity,s.settlers.length),homes,farms,
       food:Math.floor(s.food),wood:Math.floor(s.wood),faith:Math.floor(s.faith),day:Math.floor(s.time/DAY_SECONDS)+1,timeOfDay:timeOfDay(s.time),
       raining:this.raining,rain:s.rain,prayer:s.prayer?PRAYERS[s.prayer.kind]:null,
-      objective:!s.settlers.length?'Invite two settlers to begin.':guidance.length?'Your followers are carrying out your guidance. Shape clear paths and keep them fed.':!homes?'Your settlers are gathering wood for shelter.':!farms?'A home is ready. Your settlers are preparing a field.':!s.harvestedFood?'Keep the fields watered until the first harvest.':'Your village is finding its rhythm. Make room for it to grow.',
-      event:s.time-s.eventTime<18?s.lastEvent:'',workers:s.settlers.map(w=>({id:w.id,name:w.name,activity:w.job?.kind==='rally'?(w.job.route.length?'Walking to your beacon':'Gathered at your beacon'):s.beacon?.members.some(m=>m.id===w.id&&m.phase==='waiting')?'Beacon needs a path · working meanwhile':w.stranded?'Waiting for safe ground':w.job?labels[w.job.kind]:w.cargo.construction?'Construction cargo needs a safe route':w.cargo.food+w.cargo.wood>0?'Storage full or route blocked · carrying supplies':'Resting'})),
+      objective:storagePrompt||(!s.settlers.length?'Invite two settlers to begin.':guidance.length?'Your followers are carrying out your guidance. Shape clear paths and keep them fed.':!homes?'Your settlers are gathering wood for shelter.':!farms?'A home is ready. Your settlers are preparing a field.':!s.harvestedFood?'Keep the fields watered until the first harvest.':'Your village is finding its rhythm. Make room for it to grow.'),
+      event:storagePrompt||(s.time-s.eventTime<18?s.lastEvent:''),workers:s.settlers.map(w=>({id:w.id,name:w.name,activity:w.job?.kind==='rally'?(w.job.route.length?'Walking to your beacon':'Gathered at your beacon'):s.beacon?.members.some(m=>m.id===w.id&&m.phase==='waiting')?'Beacon needs a path · working meanwhile':w.stranded?'Waiting for safe ground':w.job?labels[w.job.kind]:w.cargo.construction?'Construction cargo needs a safe route':w.cargo.food+w.cargo.wood>0?'Storage full or route blocked · carrying supplies':'Resting'})),
       harvestedFood:s.harvestedFood,answered:s.answered,opportunities:this.opportunities.length,guidance};
   }
 }

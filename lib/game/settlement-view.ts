@@ -342,8 +342,8 @@ export class SettlementView {
       for(const crop of v.crops.children)crop.scale.setScalar(.14+p.crop*.86);
     }
     for(const n of s.resources){const v=this.nodes.get(n.id)??this.makeNode(n);if(n.kind==='wood'&&n.stock<v.previousStock)v.fallStarted=s.time;v.previousStock=n.stock;
-      const fall=v.fallStarted<0?0:THREE.MathUtils.clamp((s.time-v.fallStarted)/1.35,0,1),reset=fall>=1&&s.time-v.fallStarted>1.8;
-      if(reset)v.fallStarted=-1;v.root.visible=n.valid&&!(fall>=1&&!reset);v.root.position.set(n.x,this.terrain.height(n.x,n.z),n.z);v.root.rotation.z=n.kind==='wood'&&!reset?fall*1.48:0;v.crown.scale.setScalar(.25+.75*n.stock/n.capacity);}
+      const active=v.fallStarted>=0,elapsed=active?s.time-v.fallStarted:0,fall=active?THREE.MathUtils.clamp(elapsed/1.35,0,1):0,reset=n.valid&&fall>=1&&elapsed>1.8;
+      if(reset)v.fallStarted=-1;v.root.visible=n.valid?!(fall>=1&&!reset):active&&elapsed<1.8;v.root.position.set(n.x,this.terrain.height(n.x,n.z),n.z);v.root.rotation.z=n.kind==='wood'&&active&&!reset?fall*1.48:0;v.crown.scale.setScalar(.25+.75*n.stock/n.capacity);}
     const key=sim.opportunities.map(p=>`${p.kind}:${p.x},${p.z}`).join('|');
     if(key!==this.opportunityKey){
       this.opportunityKey=key;this.clearGeometry(this.opportunities);

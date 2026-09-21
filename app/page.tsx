@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Anchor, ShipWheel, Flame, Lamp, Footprints, Hand, Users, HelpCircle, Pause, Play, Focus, MousePointer2, CloudRain, Sprout, Sparkles, Wheat, TreePine, House, Download, Upload, ChevronDown, ChevronUp, Layers3, RotateCcw, X, Flag, Landmark, Beef, Fish, Hammer, Warehouse, Volume2, VolumeX } from 'lucide-react';
+import { Anchor, ShipWheel, Flame, Lamp, Footprints, Hand, Users, HelpCircle, Pause, Play, Focus, MousePointer2, CloudRain, Sprout, Sparkles, Wheat, TreePine, House, Download, Upload, ChevronDown, ChevronUp, Layers3, RotateCcw, X, Flag, Landmark, Beef, Fish, Hammer, Warehouse, Volume2, VolumeX, Sun } from 'lucide-react';
 import { CoastalAmbience } from '@/lib/game/ambience';
 import { FoodPanel } from '@/components/food-panel';
 import { WorldToolbar } from '@/components/world-toolbar';
@@ -27,6 +27,7 @@ export default function Home() {
   const [selectedBuilding,setSelectedBuilding]=useState<{id:number;name:string}|null>(null);
   const guiding=!['move','raise','lower','path'].includes(tool);
   const [showInfluence,setShowInfluence]=useState(false);
+  const [shadows,setShadows]=useState(true);
   useEffect(()=>{try{setSound(localStorage.getItem('mini-god.sound')!=='off');}catch{}return()=>{ambience.current?.dispose();ambience.current=null;};},[]);
   useEffect(()=>{const sync=()=>ambience.current?.setPlaying(started&&sound&&!paused&&!document.hidden);sync();document.addEventListener('visibilitychange',sync);return()=>document.removeEventListener('visibilitychange',sync);},[started,sound,paused]);
   function enableAudio(){try{ambience.current??=new CoastalAmbience();ambience.current.setPlaying(!paused&&!document.hidden);}catch{setSound(false);setNotice('Sound is unavailable in this browser.');}}
@@ -46,7 +47,7 @@ export default function Home() {
     const timer = window.setInterval(() => { if (api.current) { setVillage(api.current.status()); setSave(api.current.saveStatus()); setHasPrevious(api.current.hasPrevious());setPlacement(api.current.placement());setCamera(api.current.cameraStatus());setSelectedBuilding(api.current.selectedBuilding()); } }, 250);
     return () => { alive = false; window.clearInterval(timer); api.current?.dispose(); api.current = null; };
   }, []);
-  useEffect(() => { if (api.current) Object.assign(api.current.settings, { tool, brush, paused:paused||!started, speed, showPlots, showInfluence }); }, [tool, brush, paused, speed, showPlots, showInfluence, ready, started]);
+  useEffect(() => { if (api.current) Object.assign(api.current.settings, { tool, brush, paused:paused||!started, speed, showPlots, showInfluence, shadows }); }, [tool, brush, paused, speed, showPlots, showInfluence, shadows, ready, started]);
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
       if(help||reset||!started)return;
@@ -109,7 +110,7 @@ export default function Home() {
         <h2 className="panel-caption">{panel==='village'?'Your village':panel==='build'?'Build & upgrade':'Food & wildlife'}</h2>
         <div hidden={panel!=='village'}>
         <p className="village-objective">{village.objective}</p>
-        <p className="village-milestone">{village.milestone}</p><div className="village-toggles"><button aria-pressed={showInfluence} onClick={()=>setShowInfluence(v=>!v)}><Sparkles />{showInfluence?'Hide influence':'Influence'}</button><button aria-pressed={showPlots} onClick={() => setShowPlots(v => !v)} title="Show reachable terrain candidates for your building guidance"><Layers3 />{showPlots ? 'Hide plots' : 'Show plots'}</button><button onClick={() => setSpeed(v => v === 1 ? 3 : 1)} aria-label={`Simulation speed ${speed} times. Change speed.`}>{speed}× speed</button></div>
+        <p className="village-milestone">{village.milestone}</p><div className="village-toggles"><button aria-pressed={shadows} onClick={()=>setShadows(v=>!v)}><Sun />{shadows?'Shadows on':'Shadows off'}</button><button aria-pressed={showInfluence} onClick={()=>setShowInfluence(v=>!v)}><Sparkles />{showInfluence?'Hide influence':'Influence'}</button><button aria-pressed={showPlots} onClick={() => setShowPlots(v => !v)} title="Show reachable terrain candidates for your building guidance"><Layers3 />{showPlots ? 'Hide plots' : 'Show plots'}</button><button onClick={() => setSpeed(v => v === 1 ? 3 : 1)} aria-label={`Simulation speed ${speed} times. Change speed.`}>{speed}× speed</button></div>
         {village.prayer && <div className="prayer-card"><div><Sparkles /><b>{village.prayer.title}</b></div><p>{village.prayer.message}</p><span>Answer this need · +{village.prayer.reward} faith</span></div>}
         <p className="faith-status">Shared storage: {village.food}/{village.storage.food} food · {village.wood}/{village.storage.wood} wood</p>
         <p className="faith-status">{village.faithMessage}</p>

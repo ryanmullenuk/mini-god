@@ -39,6 +39,7 @@ export class Wildlife {
   private cursorRadius=6;
   private flights=Array.from({length:112},()=>({x:NaN,z:NaN,heading:0,escape:0,away:0}));
   private skyStep=0;
+  setCloudsVisible(visible:boolean){for(const cloud of [this.clouds,this.softClouds,this.wispyClouds])cloud.visible=visible;}
   setCursorRay(ray:THREE.Ray|null,radius=6){this.cursor=ray?.clone()??null;this.cursorRadius=Math.max(1,Math.min(16,radius));}
   private cursorAt(y:number){const r=this.cursor;if(!r||Math.abs(r.direction.y)<.0001)return null;const t=(y-r.origin.y)/r.direction.y;if(t<0)return null;return {x:r.origin.x+r.direction.x*t,z:r.origin.z+r.direction.z*t};}
   private avoid(x:number,y:number,z:number,index:number){
@@ -222,12 +223,12 @@ export class Wildlife {
     this.blackBodies.instanceMatrix.needsUpdate=true;this.blackWings.instanceMatrix.needsUpdate=true;
     for(let i=0;i<this.cloudCount;i++){
       const x=THREE.MathUtils.euclideanModulo(i*37.7+this.elapsed*(.22+(i%3)*.055),272)-136;
-      const z=Math.sin(i*2.39996)*99,y=21+(i%4)*2.2;
+      const z=Math.sin(i*2.39996)*99,y=55+(i%4)*4.5;
       const mesh=i<20?this.clouds:i<36?this.softClouds:this.wispyClouds,index=i<20?i:i<36?i-20:i-36;
       const bank=.8+(i%4)*.16;
       for(let j=0;j<5;j++){
         const ox=(j-2)*1.55*bank,oy=j===2?.5:0,oz=Math.sin(j*2.1+i)*.75,scale=(j===2?1.3:1)*bank;
-        this.q.setFromAxisAngle(UP,i*.72);this.matrix(mesh,index*5+j,x+ox,y+oy,z+oz,this.q,2.15*scale,(i>=36?.4:.76)*scale,1.6*scale);
+        this.q.setFromAxisAngle(UP,i*.72);this.matrix(mesh,index*5+j,x+ox*3,y+oy*3,z+oz*3,this.q,6.45*scale,(i>=36?1.2:2.28)*scale,4.8*scale);
       }
     }
     for(const mesh of [this.clouds,this.softClouds,this.wispyClouds])mesh.instanceMatrix.needsUpdate=true;
