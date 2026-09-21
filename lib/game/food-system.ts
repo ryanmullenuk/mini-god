@@ -3,7 +3,7 @@ import {EXTENT,FIRST_DRY_LAYER,type Terrain} from './terrain';
 import type {Navigation} from './navigation';
 import type {FoodJob,FoodStatus,GuidancePreview,Point,Plot,Settler,Species,WorldState} from './world-state';
 const dist=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.z-b.z);
-const entrance=(p:Point)=>({x:p.x,z:p.z+1.65});
+const entrance=(p:Point&{kind?:string})=>({x:p.x,z:p.z+(p.kind==='coop'||p.kind==='slaughterhouse'?2.65:1.65)});
 export const FOOD_JOBS:FoodJob[]=['fish','catch','pen-delivery','feed','trap-set','trap-collect','hunt','train','animal-transfer','animal-process'];
 export const FOOD_LABELS:Record<FoodJob,string>={fish:'Fishing from the shore',catch:'Herding chickens to their coop','pen-delivery':'Carrying an animal',feed:'Feeding and tending animals','trap-set':'Crafting and baiting a trap','trap-collect':'Collecting a trapped pig',hunt:'Hunting with a spear',train:'Learning Hunting','animal-transfer':'Taking livestock to the slaughterhouse','animal-process':'Preparing animal food'};
 export class FoodSystem {

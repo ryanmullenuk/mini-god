@@ -13,13 +13,21 @@ for(const name of ['food-balance','food-system','food-save','terrain','navigatio
   const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText.replace(/from ['"]\.\/([a-z-]+)['"]/g,"from './$1.mjs'");
   writeFileSync(resolve(temp,`${name}.mjs`),js);
 }
-const {Terrain,GRID,STEP,EXTENT}=await import(pathToFileURL(resolve(temp,'terrain.mjs')));
+const {Terrain,GRID,STEP,EXTENT,SEA}=await import(pathToFileURL(resolve(temp,'terrain.mjs')));
 const {Settlement}=await import(pathToFileURL(resolve(temp,'settlement.mjs')));
 const {BUILD_COST,ORDER_LIMIT}=await import(pathToFileURL(resolve(temp,'world-state.mjs')));
 const {encodeSave,decodeSave}=await import(pathToFileURL(resolve(temp,'save.mjs')));
 const {SettlementView}=await import(pathToFileURL(resolve(temp,'settlement-view.mjs')));
 const {GuidanceCursor}=await import(pathToFileURL(resolve(temp,'guidance-cursor.mjs')));
 function run(sim,seconds){for(let i=0;i<Math.round(seconds*10);i++)sim.advance(.1);}
+test('deep-water fishing schools are separated around every side of the island',()=>{
+  const terrain=new Terrain();try{
+    const schools=new Settlement(terrain).state.fishSchools;assert.equal(schools.length,8);
+    assert.ok(schools.every(s=>terrain.height(s.x,s.z)<SEA-1.35&&Math.hypot(s.x,s.z)>62));
+    for(let i=0;i<schools.length;i++)for(let j=i+1;j<schools.length;j++)assert.ok(Math.hypot(schools[i].x-schools[j].x,schools[i].z-schools[j].z)>15);
+    const quadrants=new Set(schools.map(s=>`${Math.sign(s.x)},${Math.sign(s.z)}`));assert.equal(quadrants.size,4);
+  }finally{terrain.dispose();}
+});
 function site(sim,kind){
   // Choose from the far end, rather than the first automatic expansion choice.
   const p=[...sim.opportunities].reverse().find(p=>p.kind===kind&&sim.guidancePreview(kind,p).allowed);

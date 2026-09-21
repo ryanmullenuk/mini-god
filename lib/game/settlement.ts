@@ -15,8 +15,9 @@ const PRAYERS:Record<PrayerKind,{title:string;message:string;reward:number}>={
   water:{title:'The fields are thirsty',message:'Rain would help our crops. Use the rain blessing, or wait for the next shower.',reward:6},
   ground:{title:'Help us find our footing',message:'Our land or route has changed. Shape a path beside the camp and buildings, with one-layer steps and room to stand between them.',reward:6},
 };
-export const plotBounds=(p:Point&{kind?:BuildKind})=>{const r=p.kind==='farm'?1.65:1;return {minX:p.x-r,maxX:p.x+r,minZ:p.z-r,maxZ:p.z+r};};
-export const workPoint=(p:Point&{kind?:BuildKind})=>({x:p.x,z:p.z+(p.kind==='dock'?0:p.kind==='farm'?2.25:1.65)});
+const broadPlot=(kind?:BuildKind)=>kind==='farm'||kind==='coop'||kind==='slaughterhouse';
+export const plotBounds=(p:Point&{kind?:BuildKind})=>{const r=broadPlot(p.kind)?1.65:1;return {minX:p.x-r,maxX:p.x+r,minZ:p.z-r,maxZ:p.z+r};};
+export const workPoint=(p:Point&{kind?:BuildKind})=>({x:p.x,z:p.z+(p.kind==='dock'?0:broadPlot(p.kind)?2.65:1.65)});
 const distance=(a:Point,b:Point)=>Math.hypot(a.x-b.x,a.z-b.z);
 
 export class Settlement {
@@ -36,19 +37,23 @@ export class Settlement {
       const travel=Math.max(8,Math.min(35,(boat.returnAt-boat.departAt)/2));boat.arriveAt??=boat.departAt+travel;boat.fishUntil??=Math.max(boat.arriveAt,boat.returnAt-travel);
     }
     this.seedFishSchools();this.metadata=new TerrainMetadata(terrain,undefined,createWaterWorker);
-    this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='dock'&&p.valid&&Math.abs(x-p.x)<(p.kind==='farm'?1.75:1.32)&&Math.abs(z-p.z)<(p.kind==='farm'?1.75:1.32)));
+    this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='dock'&&p.valid&&Math.abs(x-p.x)<(broadPlot(p.kind)?1.75:1.32)&&Math.abs(z-p.z)<(broadPlot(p.kind)?1.75:1.32)));
     this.foodSystem=new FoodSystem(()=>this.state,terrain,this.nav,(w,k,id,p)=>this.assign(w,k,id,p),w=>this.release(w));
   }
   private seedFishSchools(){
-    if(this.state.fishSchools.length)return;
+    if(this.state.fishSchools.length===8)return;
+    this.state.fishSchools=[];
     const candidates:{x:number;z:number;depth:number}[]=[];
     for(let z=-EXTENT/2+7;z<=EXTENT/2-7;z+=7)for(let x=-EXTENT/2+7;x<=EXTENT/2-7;x+=7){
-      const depth=SEA-this.terrain.height(x,z);if(depth>1.35)candidates.push({x,z,depth});
+      const depth=SEA-this.terrain.height(x,z);if(depth>1.35&&Math.hypot(x,z)>62)candidates.push({x,z,depth});
     }
-    candidates.sort((a,b)=>b.depth-a.depth);
-    for(const c of candidates){
-      if(this.state.fishSchools.length>=6)break;
-      if(this.state.fishSchools.every(s=>distance(s,c)>18))this.state.fishSchools.push({id:this.state.fishSchools.length+1,x:c.x,z:c.z,visits:0,regenAt:0});
+    const angleDistance=(a:number,b:number)=>Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)));
+    for(let sector=0;sector<8;sector++){
+      const angle=sector/8*Math.PI*2+.19*Math.sin(sector*4.17);
+      let choices=candidates.filter(c=>angleDistance(Math.atan2(c.z,c.x),angle)<Math.PI/7&&this.state.fishSchools.every(s=>distance(s,c)>20));
+      if(!choices.length)choices=candidates.filter(c=>angleDistance(Math.atan2(c.z,c.x),angle)<Math.PI/5&&this.state.fishSchools.every(s=>distance(s,c)>15));
+      choices.sort((a,b)=>(b.depth+.32*Math.sin(b.x*1.71+b.z*2.13))-(a.depth+.32*Math.sin(a.x*1.71+a.z*2.13)));
+      const c=choices[0];if(c)this.state.fishSchools.push({id:sector+1,x:c.x,z:c.z,visits:0,regenAt:0});
     }
   }
   private clearSeaRoute(from:Point,to:Point){

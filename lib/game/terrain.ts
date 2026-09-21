@@ -372,9 +372,10 @@ export function tropicalArchipelagoHeight(x:number,z:number){
   }
   // Existing pools remain open even at the foot of a new ridge.
   for(const pool of POOLS){const d=Math.hypot((x-pool.x)/pool.rx,(z-pool.z)/pool.rz);if(d<1.5)h=Math.min(h,1.15+2.12*d*d);}
-  // Keep the island wholly inside the editable world. This deep-water border
-  // prevents contour meshes ending in a straight, visibly clipped wall.
-  const edge=EXTENT/2-Math.max(Math.abs(x),Math.abs(z));
+  // A rounded superellipse keeps the island wholly inside the editable world
+  // without introducing the straight sides produced by a square edge fade.
+  const roundedDistance=Math.pow(Math.pow(Math.abs(x),4)+Math.pow(Math.abs(z),4),.25);
+  const edge=EXTENT/2-roundedDistance;
   if(edge<13)h=THREE.MathUtils.lerp(-2,h,THREE.MathUtils.smoothstep(edge,2.5,13));
   return Math.min(16.3,h);
 }
@@ -423,6 +424,17 @@ export class Terrain {
     }
     this.texture=new THREE.DataTexture(this.values,GRID,GRID,THREE.RedFormat,THREE.FloatType);
     this.texture.minFilter=THREE.LinearFilter;this.texture.magFilter=THREE.LinearFilter;
+    // Add fine world-space variation to green terraces. This remains crisp at
+    // close zoom and does not require a repeated bitmap texture.
+    const grass=this.materials[0];grass.onBeforeCompile=shader=>{
+      shader.vertexShader='varying vec3 terrainDetailPosition;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nterrainDetailPosition=position;');
+      shader.fragmentShader='varying vec3 terrainDetailPosition;\n'+shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+        float grassMask=smoothstep(.035,.18,diffuseColor.g-max(diffuseColor.r,diffuseColor.b));
+        float broad=sin(terrainDetailPosition.x*2.7+sin(terrainDetailPosition.z*1.9))*sin(terrainDetailPosition.z*3.1);
+        float fine=sin(terrainDetailPosition.x*10.7+terrainDetailPosition.z*7.3)*sin(terrainDetailPosition.z*12.1-terrainDetailPosition.x*4.9);
+        float tuft=smoothstep(.42,.92,broad*.34+fine*.22+.52);
+        diffuseColor.rgb*=mix(1.0,.89+tuft*.16,grassMask);`);
+    };grass.customProgramCacheKey=()=> 'terrain-grass-detail-v1';
     initialTerrainChunks??=buildTerrainChunks(this.values);this.installChunks(initialTerrainChunks);
   }
   sample(x:number,z:number){

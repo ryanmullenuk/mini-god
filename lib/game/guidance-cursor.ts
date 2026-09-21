@@ -32,14 +32,14 @@ export class GuidanceCursor {
     for(const z of [-1.05,1.05])box(this.boundary,[2.1,.035,.055],[0,.02,z],this.edge);
     for(const x of [-1.05,1.05])box(this.boundary,[.055,.035,2.1],[x,.02,0],this.edge);
     box(this.home,[1.6,1.15,1.5],[0,.65,-.08],this.fill);
-    const roof=new THREE.Mesh(new THREE.ConeGeometry(1.7,.95,4),this.fill);
-    roof.position.y=1.76;roof.rotation.y=Math.PI/4;roof.renderOrder=10;this.home.add(roof);
+    const roof=new THREE.Mesh(new THREE.ConeGeometry(1.7,.95,8),this.fill);
+    roof.position.y=1.76;roof.rotation.y=Math.PI/8;roof.renderOrder=10;this.home.add(roof);
     box(this.temple,[1.9,.25,1.9],[0,.125,0],this.fill);
     for(const x of [-.7,.7])for(const z of [-.65,.65])box(this.temple,[.2,1.8,.2],[x,1.1,z],this.fill);
     box(this.temple,[1.95,.2,1.8],[0,2.1,0],this.fill);
     const spire=new THREE.Mesh(new THREE.ConeGeometry(.65,1,4),this.fill);spire.position.y=2.7;this.temple.add(spire);
-    box(this.slaughterhouse,[1.7,1.1,.9],[0,.55,-.4],this.fill);
-    box(this.slaughterhouse,[1.9,.12,1.9],[0,.06,0],this.fill);
+    box(this.slaughterhouse,[2.35,1.18,1.25],[0,.59,-.82],this.fill);
+    box(this.slaughterhouse,[3.25,.12,3.25],[0,.06,0],this.fill);
     const area=new THREE.Mesh(new THREE.RingGeometry(.97,1,96),this.edge);area.rotation.x=-Math.PI/2;area.renderOrder=10;this.blessing.add(area);
     box(this.farm,[3.25,.07,3.25],[0,.035,0],this.fill);
     box(this.farm,[.28,.10,3.15],[0,.10,0],this.edge);box(this.farm,[3.15,.10,.28],[0,.10,0],this.edge);
@@ -49,7 +49,7 @@ export class GuidanceCursor {
     this.group.visible=!!preview;if(!preview)return;
     this.torch.visible=preview.kind==='torch';this.bonfire.visible=preview.kind==='bonfire';
     this.home.scale.setScalar(preview.kind==='home'?B.visuals.hut:1);
-    this.home.visible=preview.kind==='granary'||preview.kind==='storehouse'||preview.kind==='home'||preview.kind==='coop'||preview.kind==='pigpen';this.farm.visible=preview.kind==='farm';this.dock.visible=preview.kind==='dock';this.beacon.visible=(preview.kind==='rally'||preview.kind==='settle'||preview.kind==='fishing'||preview.kind==='trap');this.temple.visible=preview.kind==='temple';this.slaughterhouse.visible=preview.kind==='slaughterhouse';
+    this.home.visible=preview.kind==='granary'||preview.kind==='storehouse'||preview.kind==='home'||preview.kind==='pigpen';this.farm.visible=preview.kind==='farm'||preview.kind==='coop';this.dock.visible=preview.kind==='dock';this.beacon.visible=(preview.kind==='rally'||preview.kind==='settle'||preview.kind==='fishing'||preview.kind==='trap');this.temple.visible=preview.kind==='temple';this.slaughterhouse.visible=preview.kind==='slaughterhouse';
     this.blessing.visible=preview.kind==='rain'||preview.kind==='bloom';this.blessing.scale.setScalar(preview.radius??1);this.boundary.visible=!this.blessing.visible;
     this.group.position.set(preview.x,Math.max(SEA+.1,this.terrain.height(preview.x,preview.z))+.035,preview.z);
     this.group.rotation.y=preview.rotation??0;
