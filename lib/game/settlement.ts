@@ -169,6 +169,26 @@ export class Settlement {
     const message=`Your followers will build a ${BUILD_LABEL[kind].toLowerCase()} at the marked site.`;this.event(message);
     return {...preview,message};
   }
+  relocatePlot(id:number,point:Point):GuidancePreview|null{
+    const index=this.state.plots.findIndex(p=>p.id===id&&p.valid&&p.stage==='complete');if(index<0)return null;
+    const plot=this.state.plots[index];
+    if(this.state.settlers.some(w=>w.cargo.animal?.destination===id))return {...point,kind:plot.kind,allowed:false,wood:0,message:'Wait for the animal delivery to finish before moving this building.'};
+    this.state.plots.splice(index,1);this.nav.invalidate();
+    const preview=this.guidancePreview(plot.kind,{...point,rotation:plot.rotation??0},-1);
+    this.state.plots.splice(index,0,plot);this.nav.invalidate();
+    if(!preview.allowed)return {...preview,wood:0};
+    for(const w of this.state.settlers)if(w.job?.target===id||w.job?.destination===id)this.release(w);
+    plot.x=preview.x;plot.z=preview.z;if(plot.kind==='dock')plot.rotation=0;
+    this.nav.invalidate();this.needDiscovery=true;this.event(`${BUILD_LABEL[plot.kind]} moved to its new site.`);
+    return {...preview,wood:0,message:`${BUILD_LABEL[plot.kind]} moved.`};
+  }
+  deletePlot(id:number){
+    const index=this.state.plots.findIndex(p=>p.id===id&&p.valid&&p.stage==='complete');if(index<0)return false;
+    if(this.state.settlers.some(w=>w.cargo.animal?.destination===id))return false;
+    const plot=this.state.plots[index];for(const w of this.state.settlers)if(w.job?.target===id||w.job?.destination===id)this.release(w);
+    this.state.plots.splice(index,1);this.state.food=Math.min(this.state.food,this.storage.food);this.state.wood=Math.min(this.state.wood,this.storage.wood);
+    this.nav.invalidate();this.needDiscovery=true;this.event(`${BUILD_LABEL[plot.kind]} removed.`);return true;
+  }
   private availableFollowers(point:Point){
     return this.state.settlers.filter(w=>!w.stranded&&w.cargo.wood+w.cargo.food===0&&!w.cargo.animal&&!w.cargo.construction&&
       (!w.job||['wood','forage','rally'].includes(w.job.kind))).sort((a,b)=>distance(a,point)-distance(b,point)).slice(0,6);

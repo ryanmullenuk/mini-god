@@ -94,3 +94,12 @@ test('new building models have finite geometry and cottage details appear after 
   view.group.traverse(o=>{if(o.geometry?.attributes.position)for(const n of o.geometry.attributes.position.array)assert.ok(Number.isFinite(n));});
  }finally{view?.dispose();terrain.dispose();}
 });
+test('completed buildings can move to a valid site and be deleted cleanly',()=>{
+ const {terrain,sim}=setup();try{
+  const home=plot(sim,'home',5,3),granary=plot(sim,'granary',10,3);sim.state.food=sim.storage.food;
+  const moved=sim.relocatePlot(home.id,{x:-15,z:10});assert.ok(moved?.allowed,moved?.message);assert.equal(home.x,-15);assert.equal(home.z,10);
+  const blocked=sim.relocatePlot(home.id,{x:10,z:3});assert.equal(blocked?.allowed,false);assert.equal(home.x,-15);
+  assert.equal(sim.deletePlot(granary.id),true);assert.equal(sim.state.plots.some(p=>p.id===granary.id),false);assert.equal(sim.state.food,sim.storage.food);
+  assert.doesNotThrow(()=>decodeSave(encodeSave(terrain.values,sim.state)));
+ }finally{terrain.dispose();}
+});

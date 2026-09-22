@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Anchor, ShipWheel, Flame, Lamp, Footprints, Hand, Users, HelpCircle, Pause, Play, Focus, MousePointer2, CloudRain, Sprout, Sparkles, Wheat, TreePine, House, Download, Upload, ChevronDown, ChevronUp, Layers3, RotateCcw, X, Flag, Landmark, Beef, Fish, Hammer, Warehouse, Volume2, VolumeX, Sun } from 'lucide-react';
+import { Anchor, ShipWheel, Flame, Lamp, Footprints, Hand, Users, HelpCircle, Pause, Play, Focus, MousePointer2, CloudRain, Sprout, Sparkles, Wheat, TreePine, House, Download, Upload, ChevronDown, ChevronUp, Layers3, RotateCcw, X, Flag, Landmark, Beef, Fish, Hammer, Warehouse, Volume2, VolumeX, Sun, Move, Trash2 } from 'lucide-react';
 import { CoastalAmbience } from '@/lib/game/ambience';
 import { FoodPanel } from '@/components/food-panel';
 import { WorldToolbar } from '@/components/world-toolbar';
@@ -24,7 +24,7 @@ export default function Home() {
   const [showPlots, setShowPlots] = useState(false), [speed, setSpeed] = useState<1 | 3>(1), [panel, setPanel] = useState<'village'|'build'|'food'|null>(null), [notice, setNotice] = useState('');
   const [shapeOpen,setShapeOpen]=useState(false),[camera,setCamera]=useState({heading:0,overhead:false});
   const [placement,setPlacement]=useState<GuidancePreview|null>(null);
-  const [selectedBuilding,setSelectedBuilding]=useState<{id:number;name:string}|null>(null);
+  const [selectedBuilding,setSelectedBuilding]=useState<{id:number;name:string;moving:boolean}|null>(null);
   const guiding=!['move','raise','lower','path'].includes(tool);
   const [showInfluence,setShowInfluence]=useState(false);
   const [shadows,setShadows]=useState(true);
@@ -142,7 +142,7 @@ export default function Home() {
       </div>}
     </section>}
     <div className="tool-area compact-controls">
-      {selectedBuilding&&<div className="asset-rotate glass"><span>{selectedBuilding.name}</span><button onClick={()=>{if(api.current?.rotateBuilding(selectedBuilding.id))setNotice(`${selectedBuilding.name} rotated.`);else setNotice('Docks stay facing the water.');}}><RotateCcw/>Rotate</button></div>}
+      {selectedBuilding&&<div className="asset-rotate glass"><span>{selectedBuilding.name}</span><button onClick={()=>{if(api.current?.beginMoveBuilding(selectedBuilding.id))setNotice('Choose a clear new site for this building.');}}><Move/>{selectedBuilding.moving?'Choose site':'Move'}</button><button onClick={()=>{if(api.current?.rotateBuilding(selectedBuilding.id))setNotice(`${selectedBuilding.name} rotated.`);else setNotice('Docks stay facing the water.');}}><RotateCcw/>Rotate</button><button className="delete-asset" onClick={()=>setNotice(api.current?.deleteBuilding(selectedBuilding.id)?`${selectedBuilding.name} removed.`:'Finish active animal deliveries before removing this building.')}><Trash2/>Delete</button></div>}
       <output className="hint bottom-guidance" aria-live="polite"><MousePointer2/><span>{notice||(guiding&&placement?placement.message:village?.event&&population?village.event:hints[tool])}</span></output>
       <WorldToolbar tool={tool} choose={next=>{setTool(next);if(api.current)api.current.settings.tool=next;}} open={shapeOpen} setOpen={setShapeOpen} brush={brush} setBrush={setBrush} ready={ready} population={population} add={addSettlers} zoom={d=>api.current?.zoom(d)} north={()=>{api.current?.north();if(api.current)setCamera(api.current.cameraStatus());}} heading={camera.heading} overhead={camera.overhead} topView={()=>{api.current?.topView();if(api.current)setCamera(api.current.cameraStatus());}} history={history} undo={()=>api.current?.undo()} />
     </div>

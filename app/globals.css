@@ -102,7 +102,7 @@
 @media(max-height:550px){.compact-controls .hint{display:none}.shape-panel{padding:10px}.shape-heading{margin-bottom:5px}.shape-brush{padding-top:9px}}
 
 .wordmark{font-size:32px;letter-spacing:.12em}
-.asset-rotate{display:flex;align-items:center;gap:10px;padding:7px 9px 7px 15px;border-radius:22px;color:#27544e;font-size:13px;pointer-events:auto}.asset-rotate button{display:flex;align-items:center;gap:6px;border:0;border-radius:16px;background:#315f4e;color:white;padding:8px 12px}.asset-rotate svg{width:15px;height:15px}
+.asset-rotate{display:flex;align-items:center;gap:7px;padding:7px 9px 7px 15px;border-radius:22px;color:#27544e;font-size:13px;pointer-events:auto}.asset-rotate button{display:flex;align-items:center;gap:5px;border:0;border-radius:16px;background:#315f4e;color:white;padding:8px 10px}.asset-rotate button.delete-asset{background:#8b493f}.asset-rotate svg{width:15px;height:15px}
 .mini-god-splash{position:absolute;overflow:hidden;isolation:isolate;background:#164e4e;display:block}
 .mini-god-splash::before{content:'';position:absolute;inset:-24px;background:url('/polygod-splash.jpg') center/cover no-repeat;filter:blur(18px) saturate(.9) brightness(.72);transform:scale(1.05);opacity:.9}
 .splash-artwork{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;object-position:center;user-select:none;filter:drop-shadow(0 0 34px #0b354b66)}
