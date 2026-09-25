@@ -11,7 +11,7 @@ export class MarineLife{
   this.group.name='Ocean visitors';
   for(let i=0;i<7;i++){
    const kind=i<2?'whale':'dolphin',whale=kind==='whale',root=new THREE.Group(),body=new THREE.Group(),spray=new THREE.Group();root.name=whale?'Surfacing whale':'Jumping dolphin';root.add(body,spray);this.group.add(root);
-   const material=new THREE.MeshLambertMaterial({color:whale?'#476572':'#789ca4',flatShading:true});
+   const material=new THREE.MeshLambertMaterial({color:whale?'#476572':'#789ca4',flatShading:false});
    const part=(geometry:THREE.BufferGeometry,x:number,y:number,z:number,sx=1,sy=1,sz=1)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.scale.set(sx,sy,sz);body.add(m);return m;};
    part(new THREE.IcosahedronGeometry(1,1),0,0,0,whale?.82:.27,whale?.64:.26,whale?2.5:1);
    part(new THREE.IcosahedronGeometry(1,1),0,0,whale?1.4:1,whale?.78:.12,whale?.57:.12,whale?1.2:.38);

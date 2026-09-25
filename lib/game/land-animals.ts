@@ -30,7 +30,7 @@ export class LandAnimals {
   }
   private random(){let n=this.seed;n^=n<<13;n^=n>>>17;n^=n<<5;this.seed=n>>>0;return this.seed/4294967296;}
   private mesh(root:THREE.Object3D,geometry:THREE.BufferGeometry,color:string,x:number,y:number,z:number){
-    let material=this.materials.get(color);if(!material){material=new THREE.MeshLambertMaterial({color,flatShading:true});this.materials.set(color,material);}
+    let material=this.materials.get(color);if(!material){material=new THREE.MeshLambertMaterial({color,flatShading:false});this.materials.set(color,material);}
     const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.castShadow=true;root.add(m);return m;
   }
   private make(kind:AnimalKind,i:number){

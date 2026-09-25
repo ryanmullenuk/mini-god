@@ -82,7 +82,7 @@ export class Wildlife {
       }
     });
     const count=this.fish.length;
-    const fishMaterial=new THREE.MeshLambertMaterial({color:'#ffffff',emissive:'#202d30',flatShading:true});
+    const fishMaterial=new THREE.MeshLambertMaterial({color:'#ffffff',emissive:'#202d30',flatShading:false});
     this.bodies=instanced(new THREE.IcosahedronGeometry(1,0),fishMaterial,count);
     this.tails=instanced(polygon([0,0,0,-.20,.02,-.32,.20,.02,-.32]),new THREE.MeshLambertMaterial({color:'#ffffff',emissive:'#172428',side:THREE.DoubleSide}),count);
     this.fins=instanced(polygon([0,.07,-.14,0,.14,-.12,0,.09,.13]),new THREE.MeshLambertMaterial({color:'#ffffff',side:THREE.DoubleSide}),count);
@@ -99,7 +99,7 @@ export class Wildlife {
       const angle=i/12*TAU+Math.random()*.4,r=45+Math.random()*35;
       this.flocks.push({x:Math.cos(angle)*r,z:Math.sin(angle)*r*.8,heading:angle+Math.PI/2,goalX:0,goalZ:0,timer:0,speed:2.4+Math.random()*1.4,count});
     }
-    const white=new THREE.MeshLambertMaterial({color:'#fff8e9',flatShading:true});
+    const white=new THREE.MeshLambertMaterial({color:'#fff8e9',flatShading:false});
     this.birdBodies=instanced(new THREE.IcosahedronGeometry(1,0),white,this.birdCount);
     this.birdWings=instanced(polygon([0,0,.10,.63,.025,.16,1.15,-.025,-.14,0,0,.10,1.15,-.025,-.14,.33,-.01,-.25]),new THREE.MeshLambertMaterial({color:'#f5f2e5',side:THREE.DoubleSide}),this.birdCount*2);
     this.birdTips=instanced(polygon([.83,-.016,-.05,1.15,-.025,-.14,.84,-.02,-.19]),new THREE.MeshLambertMaterial({color:'#526778',side:THREE.DoubleSide}),this.birdCount*2);
@@ -110,9 +110,9 @@ export class Wildlife {
     this.blackBodies=instanced(new THREE.IcosahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:'#263139'}),80);this.blackBodies.name='Murmuration bodies';
     this.blackWings=instanced(polygon([0,0,.1,.6,.03,.12,1.1,0,-.2,0,0,.1,1.1,0,-.2,.3,0,-.22]),new THREE.MeshLambertMaterial({color:'#1d282e',side:THREE.DoubleSide}),160);this.blackWings.name='Murmuration wings';
     this.group.add(this.blackBodies,this.blackWings);
-    this.clouds=instanced(new THREE.IcosahedronGeometry(1,1),new THREE.MeshLambertMaterial({color:'#f5f9f6',flatShading:true}),100);this.clouds.name='Opaque clouds';
-    this.softClouds=instanced(new THREE.IcosahedronGeometry(1,1),new THREE.MeshLambertMaterial({color:'#f0f6f4',flatShading:true,transparent:true,opacity:.48,depthWrite:false}),80);this.softClouds.name='Soft clouds';
-    this.wispyClouds=instanced(new THREE.IcosahedronGeometry(1,1),new THREE.MeshLambertMaterial({color:'#eef5f4',flatShading:true,transparent:true,opacity:.24,depthWrite:false}),70);this.wispyClouds.name='Wispy clouds';
+    this.clouds=instanced(new THREE.IcosahedronGeometry(1,1),new THREE.MeshLambertMaterial({color:'#f5f9f6',flatShading:false}),100);this.clouds.name='Opaque clouds';
+    this.softClouds=instanced(new THREE.IcosahedronGeometry(1,1),new THREE.MeshLambertMaterial({color:'#f0f6f4',flatShading:false,transparent:true,opacity:.48,depthWrite:false}),80);this.softClouds.name='Soft clouds';
+    this.wispyClouds=instanced(new THREE.IcosahedronGeometry(1,1),new THREE.MeshLambertMaterial({color:'#eef5f4',flatShading:false,transparent:true,opacity:.24,depthWrite:false}),70);this.wispyClouds.name='Wispy clouds';
     this.group.add(this.clouds,this.softClouds,this.wispyClouds);
     this.drawFish();this.drawSky();
   }
