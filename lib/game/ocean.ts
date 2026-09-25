@@ -51,9 +51,9 @@ export function createOcean(terrain:Terrain,createShoreWorker?:()=>Worker){
       // Continuous lagoon-to-cobalt colour, with a broken reef visible in shallows.
       // Reuse the height/shore maps; no animated texture uploads or new draw calls.
       float waterDepth=depth+(noise(p*.18)-.5)*.09;
-      vec3 colour=vec3(.27,.78,.72);
-      colour=mix(colour,vec3(.055,.60,.64),smoothstep(.12,.55,waterDepth));
-      colour=mix(colour,vec3(.015,.32,.48),smoothstep(.45,1.15,waterDepth));
+      vec3 colour=vec3(.32,.84,.76);
+      colour=mix(colour,vec3(.04,.68,.70),smoothstep(.12,.55,waterDepth));
+      colour=mix(colour,vec3(.015,.38,.53),smoothstep(.45,1.15,waterDepth));
       colour=mix(colour,vec3(.006,.055,.20),smoothstep(1.0,2.1,waterDepth));
       // Broad, irregular abyssal bands and soft basin shadows remain visible
       // beyond the turquoise shelf. Multiple warped scales avoid contour-like

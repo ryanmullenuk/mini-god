@@ -143,6 +143,14 @@ export class Landscape {
       const grove=Math.sin(x*.14)+Math.cos(z*.19)+Math.sin((x+z)*.08);
       const biome=vegetationBiome(x,z);
       const sand=l<9||desertWeight(x,z)>.65||(biome==='palm'&&l<13);
+      const tropicalPalm=l>=8&&l<16&&biome!=='pine'&&biome!=='birch'&&((l<13&&r<.52&&grove>-.65)||(grove>.55&&r<.28));
+      if(tropicalPalm){
+        const s=.78+random()*.62,angle=random()*Math.PI*2;
+        put(this.trunks,x,y+1.18*s,z,.72*s,1.82*s,.72*s,'#9b7044');
+        for(let n=0;n<6;n++)put(this.palms,x,y+2.32*s,z,s,s,s,n%2?'#4e7d2e':'#76a03c',angle+n*Math.PI/3);
+        if(r<.13)for(let n=0;n<3;n++){const a=angle+n*2.1;put(this.flowers,x+Math.sin(a)*.65,y+.10,z+Math.cos(a)*.65,1.8,1.4,1.8,n===0?'#e36f4f':'#f0a251');}
+        continue;
+      }
       if(sand||l<13&&r<.08&&grove>.5){
         if(l>=7&&(l<=12||biome==='palm')&&r<.32&&grove>-.5){
           const s=.9+random()*.5,angle=random()*Math.PI*2;
@@ -185,7 +193,7 @@ export class Landscape {
       }else if(r<.48&&l<16){
         const clusterSeed=seed;
       for(let n=0;n<3;n++){
-        seed=(clusterSeed^Math.imul(n+1,83492791))>>>0;const fx=x+random()*.5,fz=z+random()*.5;if(this.terrain.level(fx,fz)===l)put(this.flowers,fx,this.terrain.height(fx,fz)+.08,fz,1,.8,1,n===0?'#eee6bb':'#dbbd70');}
+        seed=(clusterSeed^Math.imul(n+1,83492791))>>>0;const fx=x+random()*.5,fz=z+random()*.5;if(this.terrain.level(fx,fz)===l)put(this.flowers,fx,this.terrain.height(fx,fz)+.08,fz,1.35,1,1.35,n===0?'#f3e9c5':n===1?'#e87858':'#efb052');}
       }
     }
     // Clusters sit entirely in water; they never occupy a walkable beach or
@@ -204,7 +212,7 @@ export class Landscape {
         if(bed>=SEA||bed<-.85)continue;
         if(Array.from({length:8},(_,i)=>{const a=i*Math.PI/4;return this.terrain.level(rx+Math.cos(a)*size*1.35,rz+Math.sin(a)*size*1.35)>=FIRST_DRY_LAYER;}).some(Boolean))continue;
         const sy=(SEA-bed)*.6+size*.9;
-        put(this.seaRocks,rx,bed+sy*.6,rz,size,sy,size*.85,n===0?'#8b9189':'#a1a394');
+        put(this.seaRocks,rx,bed+sy*.6,rz,size,sy,size*.85,n===0?'#8f827b':'#a99b91');
         put(this.rockFoam,rx,SEA+.055,rz,size,1,size*.85);
       }
     }

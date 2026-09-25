@@ -3,8 +3,8 @@ import {DAY_SECONDS} from './world-state';
 
 const FRAMES=[
   {at:0,sky:'#65a8d1',air:'#e0f3ff',ground:'#9aa877',sun:'#ffe2ad',ambient:1.0,power:1.35,strength:.7,tint:'#f3f1e5'},
-  {at:.12,sky:'#82b6cf',air:'#dcebed',ground:'#78815c',sun:'#ffe4b0',ambient:.94,power:2.2,strength:1,tint:'#fff5df'},
-  {at:.38,sky:'#78abc5',air:'#dce8e8',ground:'#747d59',sun:'#ffdfaa',ambient:.96,power:2.3,strength:1,tint:'#fff2d9'},
+  {at:.12,sky:'#79b7d5',air:'#e4efeb',ground:'#7f8958',sun:'#ffe1a3',ambient:1.02,power:2.45,strength:1,tint:'#fff3d6'},
+  {at:.38,sky:'#70aecb',air:'#e1ece8',ground:'#7a8454',sun:'#ffdda0',ambient:1.03,power:2.55,strength:1,tint:'#fff0cf'},
   {at:.56,sky:'#786880',air:'#cba6b0',ground:'#8d7a68',sun:'#ffae7b',ambient:.95,power:1.12,strength:.62,tint:'#eed0bc'},
   {at:.70,sky:'#111d34',air:'#91ace0',ground:'#62749a',sun:'#c4d9ff',ambient:.78,power:.72,strength:0,tint:'#9db9e4'},
   {at:.90,sky:'#111d34',air:'#91ace0',ground:'#62749a',sun:'#c4d9ff',ambient:.78,power:.72,strength:0,tint:'#9db9e4'},

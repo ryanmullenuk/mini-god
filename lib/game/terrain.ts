@@ -9,7 +9,7 @@ export const LAYER_HEIGHTS = [-1.7,-1.4,-1.1,-.8,-.5,-.2,.10,.38,.66,.94,1.22,1.
 export const LAYER_COUNT = LAYER_HEIGHTS.length;
 export const layerThreshold = (l:number) => .5 + l * LAYER_INTERVAL;
 export const scalarLevel = (h:number) => Math.max(-1,Math.min(LAYER_COUNT-1,Math.floor((h-.5)/LAYER_INTERVAL)));
-export const PALETTE = ['#123f73','#176994','#218fa8','#39b9bd','#75dacf','#b7eadb','#fff0cc','#f7e4ad','#eddaa0','#96a96a','#879e5c','#79934f','#6d8949','#628044','#58763f','#506b3a','#737b52','#99977a','#a19a83','#97907a','#8c8777','#848176','#7d7b70','#74746b','#72746a','#7d8075','#898d80','#969a8a','#a4a795','#b1b39f','#bebfab','#cbc8b3'];
+export const PALETTE = ['#123f73','#176994','#218fa8','#39b9bd','#75dacf','#b7eadb','#fff1d1','#f6dda5','#e5ca83','#a7b961','#98ad57','#89a34e','#7b9846','#6e8d40','#627f3b','#58733a','#787e52','#9d9178','#a89782','#9d8e79','#928474','#898078','#807871','#76716b','#746f69','#807b73','#8c8880','#99958b','#a7a297','#b4aea1','#c1baad','#cec6b7'];
 export const DESERT_PALETTE = [...PALETTE.slice(0,8),'#e9cc88','#e0c27e','#d9b875','#d4af6e','#d0a86a','#cba166','#c39a62','#bd915e','#ba885b','#b67e56','#a96f50','#946248','#97785c','#9c8063','#a18b6d','#a59477','#9c917c','#918a7b','#968e7d','#a39883','#ad9f89','#b5aa95','#c2b6a2','#d0c5b2'];
 export const LAYER_NAMES = ['Deep seabed','Seabed','Ocean shelf','Lagoon','Shallows','Tidal shelf','Beach','Sand','Dune','Coastal grass','Light grass','Meadow','Grass','Rich grass','High grass','Dark grass','Upland soil','Earth','Dirt','High earth','Foothill','Upland','Ridge grass','Rocky grass','Lower rock','Rock','High rock','Crag','Summit rock','Pale rock','High summit','Peak'];
 export type SculptMode = 'raise'|'lower'|'path';
@@ -541,7 +541,7 @@ export function buildTerrainGeometry(values:Float32Array,previous?:Float32Array,
       const bottom=layerY(l-1)+.012,depth=layerY(l)-bottom;
       const geo=new THREE.ExtrudeGeometry(shapes,{depth,bevelEnabled:l>=FIRST_DRY_LAYER&&l<17,bevelSize:.08,bevelThickness:.035,bevelSegments:1,steps:1,curveSegments:1});
       geo.rotateX(-Math.PI/2);geo.translate(0,bottom,0);
-      const vertices=geo.getAttribute('position'),colours=new Float32Array(vertices.count*3),base=new THREE.Color(PALETTE[l]),desert=new THREE.Color(DESERT_PALETTE[l]),c=new THREE.Color(),rock=new THREE.Color('#9c9987'),pineRock=new THREE.Color(l>17?'#a8aaa1':'#89948b'),autumnRock=new THREE.Color('#ad815c');
+      const vertices=geo.getAttribute('position'),colours=new Float32Array(vertices.count*3),base=new THREE.Color(PALETTE[l]),desert=new THREE.Color(DESERT_PALETTE[l]),c=new THREE.Color(),rock=new THREE.Color('#9d8b7d'),pineRock=new THREE.Color(l>17?'#aaa49d':'#8d9389'),autumnRock=new THREE.Color('#ad815c');
       const normals=geo.getAttribute('normal');
       for(let v=0;v<vertices.count;v++){
         c.copy(base).lerp(desert,l>=8?desertWeight(vertices.getX(v),vertices.getZ(v)):0);
