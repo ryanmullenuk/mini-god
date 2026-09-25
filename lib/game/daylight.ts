@@ -3,8 +3,8 @@ import {DAY_SECONDS} from './world-state';
 
 const FRAMES=[
   {at:0,sky:'#65a8d1',air:'#e0f3ff',ground:'#9aa877',sun:'#ffe2ad',ambient:1.0,power:1.35,strength:.7,tint:'#f3f1e5'},
-  {at:.12,sky:'#74b9df',air:'#d9f6ff',ground:'#92a372',sun:'#fff0d4',ambient:1.15,power:1.9,strength:1,tint:'#ffffff'},
-  {at:.38,sky:'#68add8',air:'#e3f4ff',ground:'#92a372',sun:'#fff0cf',ambient:1.2,power:2.05,strength:1,tint:'#ffffff'},
+  {at:.12,sky:'#82b6cf',air:'#dcebed',ground:'#78815c',sun:'#ffe4b0',ambient:.94,power:2.2,strength:1,tint:'#fff5df'},
+  {at:.38,sky:'#78abc5',air:'#dce8e8',ground:'#747d59',sun:'#ffdfaa',ambient:.96,power:2.3,strength:1,tint:'#fff2d9'},
   {at:.56,sky:'#786880',air:'#cba6b0',ground:'#8d7a68',sun:'#ffae7b',ambient:.95,power:1.12,strength:.62,tint:'#eed0bc'},
   {at:.70,sky:'#111d34',air:'#91ace0',ground:'#62749a',sun:'#c4d9ff',ambient:.78,power:.72,strength:0,tint:'#9db9e4'},
   {at:.90,sky:'#111d34',air:'#91ace0',ground:'#62749a',sun:'#c4d9ff',ambient:.78,power:.72,strength:0,tint:'#9db9e4'},
@@ -27,9 +27,10 @@ export class Daylight {
     this.sun.color.copy(this.colour);this.sun.intensity=THREE.MathUtils.lerp(a.power,b.power,u);
     this.ambient.color.copy(a.air).lerp(b.air,u);this.ambient.groundColor.copy(a.ground).lerp(b.ground,u);this.ambient.intensity=THREE.MathUtils.lerp(a.ambient,b.ambient,u);
     if(this.scene.background instanceof THREE.Color)this.scene.background.copy(a.sky).lerp(b.sky,u);
+    if(this.scene.fog instanceof THREE.FogExp2)this.scene.fog.color.copy(a.sky).lerp(b.sky,u).lerp(this.ambient.color,.28);
     // A continuous sky arc; at night the cool key light provides moonlit relief.
     const angle=phase*Math.PI*2;
-    this.direction.set(-Math.cos(angle)*75,65+Math.sin(angle)*20,Math.sin(angle)*65).normalize();
+    this.direction.set(-Math.cos(angle)*82,45+Math.sin(angle)*16,Math.sin(angle)*72).normalize();
     this.sun.position.copy(this.direction).multiplyScalar(100);
     return this;
   }

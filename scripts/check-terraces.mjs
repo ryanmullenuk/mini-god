@@ -145,6 +145,9 @@ test('doubling layer indices preserves farm fertility in sandy and highland regi
 test('legacy saves retain village foundations, crops, cargo and supplies during the upgrade',()=>{
   const terrain=new Terrain();try{
     terrain.values.fill(6.7);const sim=new Settlement(terrain);sim.add(2);
+    const home=sim.opportunities.find(p=>p.kind==='home'&&sim.guidancePreview('home',p).allowed);
+    const farm=sim.opportunities.find(p=>p.kind==='farm'&&sim.guidancePreview('farm',p).allowed&&(!home||Math.hypot(p.x-home.x,p.z-home.z)>4));
+    assert.ok(home&&farm);assert.ok(sim.guide('home',home).allowed);assert.ok(sim.guide('farm',farm).allowed);
     for(let k=0;k<8000;k++)sim.advance(.1);
     assert.ok(sim.state.plots.length>=2);
     // All these samples were one old terrace, but now straddle two new levels.

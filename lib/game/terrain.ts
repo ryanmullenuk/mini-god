@@ -9,7 +9,7 @@ export const LAYER_HEIGHTS = [-1.7,-1.4,-1.1,-.8,-.5,-.2,.10,.38,.66,.94,1.22,1.
 export const LAYER_COUNT = LAYER_HEIGHTS.length;
 export const layerThreshold = (l:number) => .5 + l * LAYER_INTERVAL;
 export const scalarLevel = (h:number) => Math.max(-1,Math.min(LAYER_COUNT-1,Math.floor((h-.5)/LAYER_INTERVAL)));
-export const PALETTE = ['#123f73','#176994','#218fa8','#39b9bd','#75dacf','#b7eadb','#fff0cc','#f7e4ad','#eddaa0','#b8cd72','#a4c365','#94b756','#82aa47','#709b3d','#618b36','#507b32','#829653','#a4a07b','#aaa084','#9c927a','#918978','#898575','#828071','#797a70','#77796f','#828479','#8e9184','#9b9e8e','#aaac99','#b6b7a3','#c3c3ad','#d0ccb5'];
+export const PALETTE = ['#123f73','#176994','#218fa8','#39b9bd','#75dacf','#b7eadb','#fff0cc','#f7e4ad','#eddaa0','#96a96a','#879e5c','#79934f','#6d8949','#628044','#58763f','#506b3a','#737b52','#99977a','#a19a83','#97907a','#8c8777','#848176','#7d7b70','#74746b','#72746a','#7d8075','#898d80','#969a8a','#a4a795','#b1b39f','#bebfab','#cbc8b3'];
 export const DESERT_PALETTE = [...PALETTE.slice(0,8),'#e9cc88','#e0c27e','#d9b875','#d4af6e','#d0a86a','#cba166','#c39a62','#bd915e','#ba885b','#b67e56','#a96f50','#946248','#97785c','#9c8063','#a18b6d','#a59477','#9c917c','#918a7b','#968e7d','#a39883','#ad9f89','#b5aa95','#c2b6a2','#d0c5b2'];
 export const LAYER_NAMES = ['Deep seabed','Seabed','Ocean shelf','Lagoon','Shallows','Tidal shelf','Beach','Sand','Dune','Coastal grass','Light grass','Meadow','Grass','Rich grass','High grass','Dark grass','Upland soil','Earth','Dirt','High earth','Foothill','Upland','Ridge grass','Rocky grass','Lower rock','Rock','High rock','Crag','Summit rock','Pale rock','High summit','Peak'];
 export type SculptMode = 'raise'|'lower'|'path';
@@ -433,7 +433,8 @@ export class Terrain {
         float broad=sin(terrainDetailPosition.x*2.7+sin(terrainDetailPosition.z*1.9))*sin(terrainDetailPosition.z*3.1);
         float fine=sin(terrainDetailPosition.x*10.7+terrainDetailPosition.z*7.3)*sin(terrainDetailPosition.z*12.1-terrainDetailPosition.x*4.9);
         float tuft=smoothstep(.42,.92,broad*.34+fine*.22+.52);
-        diffuseColor.rgb*=mix(1.0,.89+tuft*.16,grassMask);`);
+        float meadow=sin(terrainDetailPosition.x*.31-terrainDetailPosition.z*.23)*sin(terrainDetailPosition.z*.27)*.5+.5;
+        diffuseColor.rgb*=mix(1.0,.86+tuft*.13+meadow*.08,grassMask);`);
     };grass.customProgramCacheKey=()=> 'terrain-grass-detail-v1';
     initialTerrainChunks??=buildTerrainChunks(this.values);this.installChunks(initialTerrainChunks);
   }

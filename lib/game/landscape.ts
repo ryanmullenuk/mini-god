@@ -147,8 +147,8 @@ export class Landscape {
         if(l>=7&&(l<=12||biome==='palm')&&r<.32&&grove>-.5){
           const s=.9+random()*.5,angle=random()*Math.PI*2;
           put(this.trunks,x,y+1.12*s,z,.8*s,1.72*s,.8*s,'#957447');
-          for(let n=0;n<6;n++)put(this.palms,x,y+2.2*s,z,s,s,s,n%2?'#568f2d':'#9abd3f',angle+n*Math.PI/3);
-        }else if(l>=7&&r<.15){put(this.bushes,x,y+.22,z,.45,.28,.4,'#b0b46e');}
+          for(let n=0;n<6;n++)put(this.palms,x,y+2.2*s,z,s,s,s,n%2?'#477a34':'#679348',angle+n*Math.PI/3);
+        }else if(l>=7&&r<.15){put(this.bushes,x,y+.22,z,.45,.28,.4,'#8f9963');}
         continue;
       }
       if(grove>-.35&&r<.83&&l<17){
@@ -160,12 +160,12 @@ export class Landscape {
         }else if(biome==='acacia'){
           for(const dx of [-.7,.65]){
             branch(x,y+1.0*s,z,dx*s,1.05*s,.13*s,.55*s,bark);
-            put(this.crowns,x+dx*s,y+2.1*s,z+.13*s,1.15*s,.4*s,.85*s,'#729a36');
+            put(this.crowns,x+dx*s,y+2.1*s,z+.13*s,1.15*s,.4*s,.85*s,'#638344');
           }
         }else{
-          const tint=biome==='birch'?(r<.35?'#b8cf55':'#8fbd3e'):biome==='autumn'?(r<.35?'#efa638':'#c86f28'):biome==='blossom'?(r<.35?'#e67aaf':'#c84f93'):['#4e852b','#6c9e32','#8eb33d'][Math.floor(random()*3)];
+          const tint=biome==='birch'?(r<.35?'#9eb75a':'#789b45'):biome==='autumn'?(r<.35?'#d4933c':'#ad682f'):biome==='blossom'?(r<.35?'#d87ca5':'#b95888'):['#496f32','#5c813a','#739548'][Math.floor(random()*3)];
           // Narrow cypress silhouettes punctuate the meadow groves.
-          if(!biome&&r<.09){put(this.crowns,x,y+2.25*s,z,.42*s,1.5*s,.42*s,'#658e42');}
+          if(!biome&&r<.09){put(this.crowns,x,y+2.25*s,z,.42*s,1.5*s,.42*s,'#536f3d');}
           else{
             branch(x,y+.8*s,z,.55*s,.9*s,.18*s,.5*s,bark);
             branch(x,y+1.0*s,z,-.45*s,1.0*s,-.18*s,.42*s,bark);
@@ -179,7 +179,7 @@ export class Landscape {
           }
         }
       }else if(grove>.15&&r<.46&&l<16){
-        const s=.35+random()*.38,tint=['#76934d','#92ac58','#617f42'][Math.floor(random()*3)];
+        const s=.35+random()*.38,tint=['#607c46','#779257','#536f3d'][Math.floor(random()*3)];
         put(this.bushes,x,y+s*.55,z,s,s*.65,s*.8,tint);
         put(this.bushes,x+.3,y+s*.35,z+.15,s*.65,s*.42,s*.62,tint);
       }else if(r<.48&&l<16){
