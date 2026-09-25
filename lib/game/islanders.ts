@@ -72,9 +72,9 @@ function makeModelRig(asset:RigAsset,female:boolean):ModelRig{
 class PersonAssets {
  materials=new Map<string,THREE.MeshLambertMaterial>();
  geometries=new Map<string,THREE.BufferGeometry>();
- readonly combined=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:false});
+ readonly combined=new THREE.MeshLambertMaterial({vertexColors:true,flatShading:true});
  readonly shadow=new THREE.MeshBasicMaterial({color:'#294331',transparent:true,opacity:.15,depthWrite:false});
- material(c:string){let m=this.materials.get(c);if(!m){m=new THREE.MeshLambertMaterial({color:c,flatShading:false});this.materials.set(c,m);}return m;}
+ material(c:string){let m=this.materials.get(c);if(!m){m=new THREE.MeshLambertMaterial({color:c,flatShading:true});this.materials.set(c,m);}return m;}
  geometry(key:string,g:THREE.BufferGeometry){const cached=this.geometries.get(key);if(cached){if(cached!==g)g.dispose();return cached;}this.geometries.set(key,g);return g;}
  dispose(){this.geometries.forEach(g=>g.dispose());this.materials.forEach(m=>m.dispose());this.combined.dispose();this.shadow.dispose();this.geometries.clear();this.materials.clear();}
 }

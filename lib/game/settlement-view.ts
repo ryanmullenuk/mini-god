@@ -51,7 +51,7 @@ export class SettlementView {
     this.prayer=new THREE.Mesh(new THREE.OctahedronGeometry(.17),glow);this.group.add(this.prayer);
 
   }
-  private material(color:string){let m=this.materialCache.get(color);if(!m){m=new THREE.MeshLambertMaterial({color,flatShading:false});this.materialCache.set(color,m);}return m;}
+  private material(color:string){let m=this.materialCache.get(color);if(!m){m=new THREE.MeshLambertMaterial({color,flatShading:true});this.materialCache.set(color,m);}return m;}
   private mesh(root:THREE.Object3D,geometry:THREE.BufferGeometry,color:string,x=0,y=0,z=0){
     const mesh=new THREE.Mesh(geometry,this.material(color));mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;root.add(mesh);return mesh;
   }
@@ -90,7 +90,7 @@ export class SettlementView {
       this.box(boat,.52,.26,.42,'#76502f',.13,.66,2.72);
       this.mesh(boat,new THREE.CylinderGeometry(.025,.035,1.35,7),'#76502f',0,1.12,2.45);
       const sailShape=new THREE.Shape();sailShape.moveTo(.02,0);sailShape.lineTo(.02,1.05);sailShape.lineTo(.72,.08);sailShape.closePath();
-      const sail=new THREE.Mesh(new THREE.ShapeGeometry(sailShape),new THREE.MeshLambertMaterial({color:'#f3dfb0',side:THREE.DoubleSide,flatShading:false}));sail.position.set(.04,.63,2.45);sail.castShadow=true;boat.add(sail);
+      const sail=new THREE.Mesh(new THREE.ShapeGeometry(sailShape),new THREE.MeshLambertMaterial({color:'#f3dfb0',side:THREE.DoubleSide,flatShading:true}));sail.position.set(.04,.63,2.45);sail.castShadow=true;boat.add(sail);
       for(let i=0;i<5;i++){const fish=this.mesh(boat,new THREE.IcosahedronGeometry(.055,0),'#a6b8b5',-.18+i*.09,.84,2.72);fish.scale.z=1.8;}
       const model=new THREE.Group();while(boat.children.length){const child=boat.children[0];child.position.z-=2.45;model.add(child);}
       const wake=new THREE.Group();wake.name='wake';

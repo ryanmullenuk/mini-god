@@ -24,7 +24,7 @@ export class Landscape {
   private landmarks=new THREE.Group();
   constructor(private terrain:Terrain){
     const batch=(name:string,geometry:THREE.BufferGeometry,color:string,count:number,sway=0)=>{
-      const material=new THREE.MeshLambertMaterial({color,flatShading:false});
+      const material=new THREE.MeshLambertMaterial({color,flatShading:true});
       if(sway){
         material.onBeforeCompile=shader=>{
           shader.uniforms.landWind=this.wind;
@@ -43,17 +43,17 @@ export class Landscape {
       m.name=name;m.count=0;m.castShadow=name!=='Flowers';m.receiveShadow=true;m.frustumCulled=false;this.group.add(m);return m;
     };
     this.trunks=batch('Tree trunks',new THREE.CylinderGeometry(.09,.16,1.3,5),'#ffffff',8500);
-    this.crowns=batch('Leafy groves',new THREE.IcosahedronGeometry(1,1),'#ffffff',10000,.055);
-    this.pines=batch('Upland pines',new THREE.ConeGeometry(.75,2.6,12),'#ffffff',5000,.035);
+    this.crowns=batch('Leafy groves',new THREE.IcosahedronGeometry(1,0),'#ffffff',10000,.055);
+    this.pines=batch('Upland pines',new THREE.ConeGeometry(.75,2.6,7),'#ffffff',5000,.035);
     this.bushes=batch('Bushes',new THREE.IcosahedronGeometry(1,1),'#ffffff',2200,.075);
     // A folded, tapered frond. Six radial instances form an open palm canopy.
     const leaf=new THREE.BufferGeometry();
     leaf.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0, .75,.20,-.25, .8,.31,0, 0,0,0,.8,.31,0,.75,.20,.25, .75,.20,-.25,1.9,-.35,0,.8,.31,0, .8,.31,0,1.9,-.35,0,.75,.20,.25],3));leaf.computeVertexNormals();
     this.palms=batch('Beach palm fronds',leaf,'#ffffff',6500,.08);
     (this.palms.material as THREE.MeshLambertMaterial).side=THREE.DoubleSide;
-    this.rocks=batch('Upland rocks',new THREE.IcosahedronGeometry(.6,1),'#a69f87',40000);
+    this.rocks=batch('Upland rocks',new THREE.IcosahedronGeometry(.6,0),'#a69f87',40000);
     this.flowers=batch('Flowers',new THREE.IcosahedronGeometry(.09,0),'#ffffff',2200,.10);
-    this.seaRocks=batch('Shoreline boulders',new THREE.IcosahedronGeometry(1,1),'#ffffff',1000);
+    this.seaRocks=batch('Shoreline boulders',new THREE.IcosahedronGeometry(1,0),'#ffffff',1000);
     const foamGeometry=new THREE.RingGeometry(.76,1.7,24,3);foamGeometry.rotateX(-Math.PI/2);
     const foamMaterial=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{time:this.wind,daylightTint:this.daylightTint},
       vertexShader:`uniform float time; varying vec2 local; varying float phase;
@@ -88,44 +88,16 @@ export class Landscape {
   }
   private makeLandmarks(){
     this.landmarks.name='Volcano and waterfall';
-    const lava=new THREE.MeshBasicMaterial({color:'#ff5a1f',toneMapped:false}),dark=new THREE.MeshLambertMaterial({color:'#3d3937',flatShading:false});
+    const lava=new THREE.MeshBasicMaterial({color:'#ff5a1f',toneMapped:false}),dark=new THREE.MeshLambertMaterial({color:'#3d3937',flatShading:true});
     const crater=new THREE.Mesh(new THREE.TorusGeometry(2.1,.48,7,18),dark);crater.rotation.x=-Math.PI/2;
     crater.position.set(VOLCANO.x,this.terrain.height(VOLCANO.x,VOLCANO.z)+.10,VOLCANO.z);crater.castShadow=true;this.landmarks.add(crater);
     const glow=new THREE.Mesh(new THREE.CircleGeometry(1.72,24),lava);glow.rotation.x=-Math.PI/2;glow.position.set(VOLCANO.x,crater.position.y+.08,VOLCANO.z);glow.renderOrder=2;this.landmarks.add(glow);
     for(let i=0;i<5;i++){const smoke=new THREE.Mesh(new THREE.IcosahedronGeometry(.55+i*.16,1),new THREE.MeshLambertMaterial({color:i<2?'#625b55':'#aaa9a1',transparent:true,opacity:.45-i*.045,depthWrite:false}));smoke.position.set(VOLCANO.x+Math.sin(i*2.1)*.6,crater.position.y+1.2+i*.82,VOLCANO.z+Math.cos(i*1.7)*.5);this.landmarks.add(smoke);}
     const top=this.terrain.height(WATERFALL.x,WATERFALL.sourceZ),bottom=Math.max(SEA+.12,this.terrain.height(WATERFALL.x,1)),height=Math.max(1.5,top-bottom);
-    const cascade=new THREE.ShaderMaterial({transparent:true,side:THREE.DoubleSide,depthWrite:false,toneMapped:true,uniforms:{time:this.wind,daylightTint:this.daylightTint},
-      vertexShader:`uniform float time;varying vec2 fallUv;varying float edge;
-        void main(){fallUv=uv;edge=sin(uv.y*19.0+uv.x*8.0+time*3.2)*.035;vec3 p=position;p.z+=edge*(.25+uv.y*.75);gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);}`,
-      fragmentShader:`uniform float time;uniform vec3 daylightTint;varying vec2 fallUv;varying float edge;
-        void main(){
-          vec2 cell=floor(fallUv*vec2(34.0,72.0));
-          float broken=.5+.5*sin(cell.x*12.71+cell.y*3.17);
-          float ribbon=.5+.5*sin(fallUv.x*31.0+sin(fallUv.x*8.0)*2.0-time*.8);
-          float rush=.5+.5*sin(fallUv.y*92.0-time*11.0+fallUv.x*17.0);
-          float fast=.5+.5*sin(fallUv.y*173.0-time*18.0-cell.x*.37);
-          float sides=smoothstep(0.0,.13,fallUv.x)*smoothstep(0.0,.13,1.0-fallUv.x);
-          float foam=smoothstep(.55,.96,rush*.58+fast*.34+ribbon*.28+broken*.12);
-          vec3 colour=mix(vec3(.08,.57,.69),vec3(.88,1.0,.98),foam)*daylightTint;
-          float alpha=(.52+foam*.43)*sides*(.88+.12*edge);
-          gl_FragColor=vec4(colour,alpha);
-          #include <tonemapping_fragment>
-          #include <colorspace_fragment>
-        }`});
-    const sheet=new THREE.Mesh(new THREE.PlaneGeometry(WATERFALL.width,height,24,48),cascade);sheet.name='Animated waterfall';sheet.position.set(WATERFALL.x,bottom+height/2,-2.75);sheet.rotation.y=Math.PI;sheet.renderOrder=3;this.landmarks.add(sheet);
-    const veil=new THREE.Mesh(new THREE.PlaneGeometry(WATERFALL.width*.82,height*.96,18,42),cascade);veil.position.set(WATERFALL.x+.08,bottom+height*.48,-2.69);veil.rotation.y=Math.PI;veil.renderOrder=4;this.landmarks.add(veil);
-    const streamMaterial=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{time:this.wind,daylightTint:this.daylightTint},vertexShader:'varying vec2 waterUv;void main(){waterUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:`uniform float time;uniform vec3 daylightTint;varying vec2 waterUv;
-      void main(){
-        float current=.5+.5*sin(waterUv.y*58.0-time*7.0+sin(waterUv.x*19.0)*2.0);
-        float glint=smoothstep(.72,.96,current)*(.35+.65*sin(waterUv.x*38.0)*sin(waterUv.x*38.0));
-        vec3 c=mix(vec3(.08,.58,.68),vec3(.82,1.0,.96),glint)*daylightTint;
-        gl_FragColor=vec4(c,.58+glint*.28);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }`});
-    const stream=new THREE.Mesh(new THREE.PlaneGeometry(WATERFALL.width*.7,6,12,36),streamMaterial);stream.name='Animated waterfall stream';stream.rotation.x=-Math.PI/2;stream.position.set(WATERFALL.x,top+.08,-6);stream.renderOrder=3;this.landmarks.add(stream);
-    const mistMaterial=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{time:this.wind},vertexShader:'varying vec2 mistUv;void main(){mistUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform float time;varying vec2 mistUv;void main(){vec2 p=mistUv-.5;float r=length(p);float pulse=.72+.28*sin(time*3.0-r*18.0);float a=(1.0-smoothstep(.12,.5,r))*smoothstep(.02,.15,r)*pulse;gl_FragColor=vec4(.9,1.0,1.0,a*.48);}' });
-    const mist=new THREE.Mesh(new THREE.CircleGeometry(3.2,48),mistMaterial);mist.name='Waterfall spray';mist.rotation.x=-Math.PI/2;mist.position.set(WATERFALL.x,bottom+.12,-2.4);mist.renderOrder=5;this.landmarks.add(mist);
+    const water=new THREE.MeshBasicMaterial({color:'#bceff2',transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false});
+    const sheet=new THREE.Mesh(new THREE.PlaneGeometry(WATERFALL.width,height,8,10),water);sheet.name='Waterfall';sheet.position.set(WATERFALL.x,bottom+height/2,-2.75);sheet.rotation.y=Math.PI;sheet.renderOrder=3;this.landmarks.add(sheet);
+    const stream=new THREE.Mesh(new THREE.PlaneGeometry(WATERFALL.width*.7,6,4,8),water);stream.rotation.x=-Math.PI/2;stream.position.set(WATERFALL.x,top+.08,-6);stream.renderOrder=3;this.landmarks.add(stream);
+    const mist=new THREE.Mesh(new THREE.RingGeometry(.5,3.2,32),new THREE.MeshBasicMaterial({color:'#e8ffff',transparent:true,opacity:.30,depthWrite:false,side:THREE.DoubleSide}));mist.rotation.x=-Math.PI/2;mist.position.set(WATERFALL.x,bottom+.12,-2.4);mist.renderOrder=4;this.landmarks.add(mist);
     // Keep the nine top-level instanced batches stable for fast scenery updates.
     this.rocks.add(this.landmarks);
   }
