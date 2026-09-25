@@ -26,13 +26,25 @@ function invariants(sim){
   assert.ok(Math.abs(s.food-(24+s.deliveredFood-s.consumedFood))<1e-6);
 }
 
-test('two autonomous settlers build shelter, farm, deliver a harvest and answer a real prayer',()=>{
+test('two settlers follow player guidance, then work autonomously and answer a real prayer',()=>{
   const terrain=new Terrain();try{
     const sim=new Settlement(terrain);assert.equal(sim.add(2),2);
+    const home=sim.opportunities.find(p=>p.kind==='home'&&sim.guidancePreview('home',p).allowed);
+    const farm=sim.opportunities.find(p=>p.kind==='farm'&&sim.guidancePreview('farm',p).allowed&&(!home||Math.hypot(p.x-home.x,p.z-home.z)>4));
+    assert.ok(home&&farm);assert.ok(sim.guide('home',home).allowed);assert.ok(sim.guide('farm',farm).allowed);
     for(let k=0;k<8000;k++){sim.advance(.1);if(k%100===0)invariants(sim);}
     const s=sim.status();console.log('800-second village:',JSON.stringify(s));
     assert.ok(s.homes>=1);assert.ok(s.farms>=1);assert.ok(s.harvestedFood>0);assert.ok(s.answered>=1);
     assert.equal(sim.state.trails.length,0);
+  }finally{terrain.dispose();}
+});
+
+test('followers gather by day but never create unrequested huts or farms',()=>{
+  const terrain=new Terrain();try{
+    const sim=new Settlement(terrain);sim.add(2);run(sim,45);
+    assert.equal(sim.state.plots.length,0);assert.equal(sim.state.orders.length,0);
+    assert.ok(sim.state.deliveredWood>0||sim.state.deliveredFood>0,'idle followers gather resources');
+    assert.ok(sim.state.resources.some(n=>Math.hypot(n.x-sim.state.camp.x,n.z-sim.state.camp.z)>25),'resources extend beyond the starting clearing');
   }finally{terrain.dispose();}
 });
 

@@ -39,6 +39,9 @@ export class Settlement {
     this.seedFishSchools();this.metadata=new TerrainMetadata(terrain,undefined,createWaterWorker);
     this.nav=new Navigation(terrain,(x,z)=>this.state.plots.some(p=>p.kind!=='dock'&&p.valid&&Math.abs(x-p.x)<(broadPlot(p.kind)?1.75:1.32)&&Math.abs(z-p.z)<(broadPlot(p.kind)?1.75:1.32)));
     this.foodSystem=new FoodSystem(()=>this.state,terrain,this.nav,(w,k,id,p)=>this.assign(w,k,id,p),w=>this.release(w));
+    // Existing islands created with the old camp-only resource ring receive
+    // the wider exploration pool without restoring any tree already felled.
+    if(this.state.camp&&this.state.resources.length<54)this.seedResources();
   }
   private seedFishSchools(){
     if(this.state.fishSchools.length===8)return;
@@ -310,9 +313,10 @@ export class Settlement {
   }
   private seedResources(){
     const camp=this.state.camp;if(!camp)return;
-    // Stable seeded resources grow only where the original terrain supports them.
-    for(let k=0;k<220&&this.state.resources.length<22;k++){
-      const a=this.random()*Math.PI*2,r=5+this.random()*14,p={x:camp.x+Math.sin(a)*r,z:camp.z+Math.cos(a)*r};
+    // Reachable resources extend across the island, so idle followers explore
+    // beyond the first clearing instead of exhausting a tiny ring around camp.
+    for(let k=0;k<1200&&this.state.resources.length<54;k++){
+      const a=this.random()*Math.PI*2,r=5+Math.pow(this.random(),.72)*70,p={x:camp.x+Math.sin(a)*r,z:camp.z+Math.cos(a)*r};
       if(!this.nav.safe(p.x,p.z)||this.state.resources.some(n=>distance(n,p)<2.3)||!this.nav.route(camp,p))continue;
       const kind=this.state.resources.length%3===0?'forage':'wood',capacity=kind==='wood'?12:10;
       this.state.resources.push({...p,id:this.id(),kind,stock:capacity,capacity,regrowth:0,claimedBy:null,valid:true});
@@ -644,15 +648,9 @@ export class Settlement {
     if(s.tier===1&&s.harvestedFood>0&&s.plots.filter(p=>p.kind==='home'&&p.valid&&p.stage==='complete').length>=2&&s.plots.some(p=>p.kind==='temple'&&p.valid&&p.stage==='complete')){
       s.tier=2;this.event('Village tier 2 unlocked. Temple influence and targeted blessings now reach farther.');
     }
-    if(s.tick%15===1){
+    if(s.tick%5===1){
       if(this.needDiscovery)this.discover();
-      const homes=s.plots.filter(p=>p.kind==='home'&&p.valid).length;
-      const farms=s.plots.filter(p=>p.kind==='farm'&&p.valid).length;
-      const guided=s.orders.length>0;this.processOrders();
-      if(!guided){
-        if(homes<Math.min(20,Math.floor(s.settlers.length/V.hutCapacity)+1))this.reserve('home');
-        else if(farms<Math.ceil(s.settlers.length/V.hutCapacity))this.reserve('farm');
-      }
+      this.processOrders();
       for(const w of s.settlers)this.decide(w);
     }
     if(s.tick%2400===1&&s.settlers.length<Math.min(V.maxPopulation,this.capacity)&&s.food>=s.settlers.length*5+6)this.add(1,undefined,false);

@@ -32,12 +32,9 @@ export class GuidanceCursor {
     for(const z of [-1.05,1.05])box(this.boundary,[2.1,.035,.055],[0,.02,z],this.edge);
     for(const x of [-1.05,1.05])box(this.boundary,[.055,.035,2.1],[x,.02,0],this.edge);
     box(this.home,[1.6,1.15,1.5],[0,.65,-.08],this.fill);
-    const roof=new THREE.Mesh(new THREE.ConeGeometry(1.7,.95,8),this.fill);
-    roof.position.y=1.76;roof.rotation.y=Math.PI/8;roof.renderOrder=10;this.home.add(roof);
     box(this.temple,[1.9,.25,1.9],[0,.125,0],this.fill);
     for(const x of [-.7,.7])for(const z of [-.65,.65])box(this.temple,[.2,1.8,.2],[x,1.1,z],this.fill);
     box(this.temple,[1.95,.2,1.8],[0,2.1,0],this.fill);
-    const spire=new THREE.Mesh(new THREE.ConeGeometry(.65,1,4),this.fill);spire.position.y=2.7;this.temple.add(spire);
     box(this.slaughterhouse,[2.35,1.18,1.25],[0,.59,-.82],this.fill);
     box(this.slaughterhouse,[3.25,.12,3.25],[0,.06,0],this.fill);
     const area=new THREE.Mesh(new THREE.RingGeometry(.97,1,96),this.edge);area.rotation.x=-Math.PI/2;area.renderOrder=10;this.blessing.add(area);

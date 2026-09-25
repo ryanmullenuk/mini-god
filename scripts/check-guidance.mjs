@@ -60,7 +60,7 @@ test('free guidance gathers wood, builds at the selected sites, farms and delive
   }finally{terrain.dispose();}
 });
 
-test('a requested farm takes priority over the automatic hut and only spends its own cost',()=>{
+test('a requested farm builds only the player request and spends only its own cost',()=>{
   const {terrain,sim}=flat();try{
     sim.state.wood=6;const p={x:1,z:3};assert.ok(sim.guide('farm',p).allowed);
     const id=sim.state.orders[0].id;sim.advance(.1);
