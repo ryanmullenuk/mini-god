@@ -148,3 +148,13 @@ test('natural island-wide storms vary by cycle and accelerate tree regrowth',()=
     assert.ok(Math.abs(waited-firstStart)>1,'Storm timing varies between cycles');
   }finally{terrain.dispose();}
 });
+
+test('followers rest in homes at night and approach trees from the side by day',()=>{
+  const terrain=new Terrain();terrain.values.fill(7.2);const sim=new Settlement(terrain);try{
+    sim.add(2);const [worker]=sim.state.settlers,home={x:worker.x+3,z:worker.z,id:sim.state.nextId++,kind:'home',stage:'complete',progress:1,valid:true,claimedBy:null,moisture:.6,fertility:.7,crop:0,planted:false,harvests:0};
+    sim.state.plots=[home];worker.job=null;sim.state.time=180;sim.decide(worker);
+    assert.equal(worker.job?.kind,'rest');assert.equal(worker.job?.target,home.id);
+    worker.job=null;sim.state.time=60;const tree={x:worker.x+5,z:worker.z,id:sim.state.nextId++,kind:'wood',stock:12,capacity:12,regrowth:0,claimedBy:null,valid:true};sim.state.resources=[tree];
+    assert.ok(sim.resourceJob(worker,'wood'));const stop=worker.job.route.at(-1);assert.ok(Math.hypot(stop.x-tree.x,stop.z-tree.z)>.9,'worker stops beside the trunk');
+  }finally{terrain.dispose();}
+});

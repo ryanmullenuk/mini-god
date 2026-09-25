@@ -251,7 +251,7 @@ export class Islanders{
    const targetY=Math.max(this.terrain.height(a.x,a.z),a.stranded?0.08:-10);
    const relocated=!p.synced||Math.hypot(p.x-a.x,p.z-a.z)>1||Math.abs(p.root.position.y-targetY)>.65;
    const y=relocated||paused?targetY:THREE.MathUtils.damp(p.root.position.y,targetY,16,dt);
-   p.synced=true;p.x=a.x;p.z=a.z;p.angle=a.heading;p.root.visible=true;p.root.position.set(a.x,y,a.z);p.root.rotation.y=a.heading;
+   p.synced=true;p.x=a.x;p.z=a.z;p.angle=a.heading;p.root.visible=!(a.job?.kind==='rest'&&!a.job.route.length);p.root.position.set(a.x,y,a.z);p.root.rotation.y=a.heading;
    if(!p.cargoMesh){p.cargoMesh=part(p.torso,this.assets.geometries.get('cargo')??this.assets.geometry('cargo',new THREE.BoxGeometry(.28,.25,.26)),this.assets.material('#bd995e'),0,-.05,.29);}
    p.cargoMesh.visible=a.cargo.food+a.cargo.wood>0||!!a.cargo.construction;
    p.carried.visible=!!a.cargo.animal;p.carried.scale.setScalar(a.cargo.animal?.species==='chicken'?.65:1.7);
@@ -261,7 +261,7 @@ export class Islanders{
    p.scythe.visible=a.job?.kind==='harvest'&&!a.job.route.length&&!a.stranded;
    if(paused)continue;
    p.speed=THREE.MathUtils.damp(p.speed,a.moving?1:0,8,dt);p.phase+=dt*1.05*.61/(.29*p.root.scale.x)*p.speed;
-   const phase=p.phase*TAU,working=!!a.job&&!a.job.route.length&&a.job.kind!=='deliver'&&a.job.kind!=='rally',praying=working&&a.job?.kind==='worship',building=working&&a.job?.kind==='build'&&!a.stranded,harvesting=working&&a.job?.kind==='harvest'&&!a.stranded;
+   const phase=p.phase*TAU,working=!!a.job&&!a.job.route.length&&!['deliver','rally','rest'].includes(a.job.kind),praying=working&&a.job?.kind==='worship',building=working&&a.job?.kind==='build'&&!a.stranded,harvesting=working&&a.job?.kind==='harvest'&&!a.stranded;
    p.kneel=THREE.MathUtils.damp(p.kneel,building?1:0,12,dt);p.hammer.visible=building;
    p.torso.rotation.x=.2*p.kneel;p.head.rotation.x=.18*p.kneel;
    p.body.position.y=Math.cos(phase*2)*.009*p.speed-.295*p.kneel;p.torso.rotation.y=Math.sin(phase)*.055*p.speed;

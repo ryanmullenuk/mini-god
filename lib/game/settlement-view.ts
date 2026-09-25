@@ -101,18 +101,14 @@ export class SettlementView {
       this.box(building,1.62,1.18,1.52,'#f1ead7',0,.67,-.08);
       this.box(building,.46,.82,.05,'#438ca4',0,.46,.69);
       for(const x of [-.72,.72])for(const z of [-.65,.65])this.box(building,.12,1.0,.12,'#e4dcc8',x,.58,z);
-      const roof=this.mesh(building,new THREE.ConeGeometry(1.72,.72,8),'#c87545',0,1.63,0);roof.rotation.y=Math.PI/8;
-      this.box(building,.20,.48,.22,'#eee6d3',.52,1.65,-.33);
       const cottage=new THREE.Group();cottage.name='cottage';building.add(cottage);
       this.box(cottage,.38,.72,.42,'#f1ead7',.48,1.64,-.38);
       for(const x of [-.48,.48])this.box(cottage,.25,.3,.045,'#69a5b2',x,.85,.70);
-      this.box(cottage,1.3,.1,.42,'#c87545',0,.12,.93);
     }else if(p.kind==='granary'||p.kind==='storehouse'){
       const food=p.kind==='granary';
       this.box(building,1.85,.16,1.85,'#9e825c',0,.08,0);
       this.box(building,1.5,1.0,1.4,food?'#d4c397':'#a28b6b',0,.65,0);
       this.box(building,.6,.75,.04,'#536354',0,.48,.72);
-      const roof=this.mesh(building,new THREE.ConeGeometry(1.35,.65,8),food?'#ac995c':'#698b81',0,1.48,0);roof.rotation.y=Math.PI/8;
       for(const x of [-.68,.68])this.box(building,.055,.95,.055,'#806745',x,.64,.73);
       if(food)for(const x of [-.55,.55])this.mesh(building,new THREE.IcosahedronGeometry(.2,1),'#cdbc8b',x,.3,.95);
       else for(let i=0;i<3;i++)this.box(building,.62,.13,.15,'#977249',.55,.2+i*.14,.96);
@@ -120,7 +116,6 @@ export class SettlementView {
       for(let i=0;i<3;i++)this.box(building,2-i*.22,.13,2-i*.22,'#ddd5b3',0,.065+i*.13,0);
       for(const x of [-.65,.65])for(const z of [-.65,.65])this.mesh(building,new THREE.CylinderGeometry(.11,.16,1.65,8),'#f0e8ce',x,1.15,z);
       this.box(building,1.88,.2,1.88,'#ddd5b3',0,2.05,0);
-      const roof=this.mesh(building,new THREE.ConeGeometry(1.32,.75,8),'#448b83',0,2.48,0);roof.rotation.y=Math.PI/8;
       this.mesh(building,new THREE.OctahedronGeometry(.22),'#f2d284',0,3,0);
       this.box(building,.5,.45,.4,'#aa956a',0,.59,0);
     }else if(p.kind==='coop'||p.kind==='pigpen'){
@@ -128,7 +123,6 @@ export class SettlementView {
       for(const x of [-1.58,1.58])for(const z of [-1.58,1.58])this.box(building,.075,.72,.075,'#96744d',x,.36,z);
       for(const y of [.28,.56]){for(const z of [-1.58,1.58])this.box(building,3.15,.05,.05,'#ac895a',0,y,z);for(const x of [-1.58,1.58])this.box(building,.05,.05,3.15,'#ac895a',x,y,0);}
       this.box(building,1.28,.72,.92,'#d1ba87',-.82,.46,-1.03);
-      const roof=this.mesh(building,new THREE.ConeGeometry(.96,.52,8),'#986e4d',-.82,1.08,-1.03);roof.rotation.y=Math.PI/8;roof.scale.z=.82;
       for(let i=0;i<(p.kind==='coop'?8:6);i++){
         const animal=new THREE.Group();animal.position.set(-.55+(i%3)*.5,0,-.05+Math.floor(i/3)*.3);animals.add(animal);
         const chicken=p.kind==='coop',body=this.mesh(animal,new THREE.IcosahedronGeometry(chicken?.09:.14,1),chicken?'#e9dfbb':'#dcaa96',0,.17,0);body.scale.z=1.4;
@@ -138,7 +132,6 @@ export class SettlementView {
     }else if(p.kind==='slaughterhouse'){
       this.box(building,3.25,.1,3.25,'#a49773',0,.05,0);
       this.box(building,2.35,1.18,1.25,'#d6c0a0',0,.69,-.82);
-      const roof=this.mesh(building,new THREE.ConeGeometry(1.62,.72,8),'#9d684d',0,1.64,-.82);roof.rotation.y=Math.PI/8;roof.scale.z=.78;
       this.box(building,.38,.7,.04,'#51493c',.4,.45,.015);
       for(const x of [-1.58,1.58])for(const z of [.05,1.58])this.box(building,.075,.65,.075,'#846647',x,.35,z);
       for(const y of [.24,.52]){this.box(building,3.15,.05,.06,'#997b55',0,y,1.58);for(const x of [-1.58,1.58])this.box(building,.06,.05,1.55,'#997b55',x,y,.82);}

@@ -382,8 +382,9 @@ export class Settlement {
     if(w.job.kind==='supply'&&!w.cargo.construction)return this.state.camp;
     if(w.job.kind==='rally')return this.state.beacon?.members.find(m=>m.id===w.id)?.destination??null;
     if(w.job.kind==='gather'){const p=this.state.plots.find(p=>p.id===w.job!.target);return p?gatheringPoint(p,w.id):null;}
+    if(w.job.kind==='rest'){const p=this.state.plots.find(p=>p.id===w.job!.target);return p?workPoint(p):null;}
     if(w.job.kind==='clear')return w.job.route.at(-1)??w;
-    if(w.job.kind==='wood'||w.job.kind==='forage')return this.state.resources.find(n=>n.id===w.job?.target)??null;
+    if(w.job.kind==='wood'||w.job.kind==='forage')return w.job.route.at(-1)??this.state.resources.find(n=>n.id===w.job?.target)??null;
     const p=this.state.plots.find(p=>p.id===w.job?.target);return p?workPoint(p):null;
   }
   private assign(w:Settler,kind:JobKind,target:number,point:Point){
@@ -395,13 +396,27 @@ export class Settlement {
   }
   private resourceJob(w:Settler,kind:'wood'|'forage'){
     const nodes=this.state.resources.filter(n=>n.kind===kind&&n.valid&&n.stock>=1&&n.claimedBy===null).sort((a,b)=>distance(a,w)-distance(b,w));
-    return nodes.some(n=>this.assign(w,kind,n.id,n));
+    return nodes.some(n=>{
+      const start=Math.atan2(w.x-n.x,w.z-n.z);
+      for(let i=0;i<8;i++){
+        const angle=start+i*Math.PI/4,point={x:n.x+Math.sin(angle)*1.15,z:n.z+Math.cos(angle)*1.15};
+        if(this.nav.safe(point.x,point.z)&&this.assign(w,kind,n.id,point))return true;
+      }
+      return false;
+    });
+  }
+  private homeFor(w:Settler){
+    const index=this.state.settlers.indexOf(w),homes=this.state.plots.filter(p=>p.kind==='home'&&p.stage==='complete'&&p.valid);
+    let offset=0;for(const home of homes){offset+=homeCapacity(home);if(index<offset)return home;}return null;
   }
   private decide(w:Settler){
     if(w.stranded||w.job)return;
     if(w.cargo.construction){const p=this.state.plots.find(p=>p.id===w.cargo.construction!.site);if(p&&p.valid&&p.claimedBy===null)this.assign(w,'supply',p.id,workPoint(p));return;}
     if(w.cargo.animal){this.foodSystem.decide(w);return;}
     if(w.cargo.wood+w.cargo.food>0){this.deliver(w);return;}
+    if(timeOfDay(this.state.time)==='Night'){
+      const home=this.homeFor(w);if(home)this.assign(w,'rest',home.id,workPoint(home));return;
+    }
     const hungry=this.state.food<this.state.settlers.length*3;
     if(hungry&&this.resourceJob(w,'forage'))return;
     const clearing=this.state.orders.find(o=>this.insideSite(w,o)&&this.state.wood>=BUILD_COST[o.kind]);
@@ -429,6 +444,8 @@ export class Settlement {
     }
     if(this.state.food<this.state.settlers.length*12&&this.resourceJob(w,'forage'))return;
     if(!hungry&&this.capacity>=this.state.settlers.length&&this.state.time-(w.lastWorship??-120)>=90)for(const p of plots.filter(p=>p.kind==='temple'&&p.stage==='complete'&&(p.offerings??0)<50))if(this.assign(w,'worship',p.id,workPoint(p)))return;
+    if((w.id+Math.floor(this.state.time/18))%2===0){if(this.resourceJob(w,'wood'))return;this.resourceJob(w,'forage');}
+    else {if(this.resourceJob(w,'forage'))return;this.resourceJob(w,'wood');}
   }
   private walk(w:Settler,dt:number){
     const job=w.job;if(!job||!job.route.length)return;
@@ -450,6 +467,11 @@ export class Settlement {
       const p=this.state.plots.find(p=>p.id===job.target);
       if(p)w.heading=Math.atan2(p.x-w.x,p.z-w.z);
       if(job.work>=FIRE_BALANCE.gatherSeconds)this.release(w);
+      return;
+    }
+    if(job.kind==='rest'){
+      const home=this.state.plots.find(p=>p.id===job.target&&p.kind==='home'&&p.valid&&p.stage==='complete');
+      if(!home||timeOfDay(this.state.time)!=='Night')this.release(w);
       return;
     }
     if(job.kind==='rally'){
@@ -634,7 +656,7 @@ export class Settlement {
       for(const w of s.settlers)this.decide(w);
     }
     if(s.tick%2400===1&&s.settlers.length<Math.min(V.maxPopulation,this.capacity)&&s.food>=s.settlers.length*5+6)this.add(1,undefined,false);
-    for(const w of s.settlers){w.moving=false;if(w.job?.kind==='unload-boat')this.release(w);if(w.job?.kind==='gather'&&(!evening(s.time)||s.food<s.settlers.length*3||s.orders.length>0||!s.plots.some(p=>p.id===w.job!.target&&p.valid&&p.stage==='complete')))this.release(w);if(w.stranded)continue;this.foodSystem.beforeWalk(w);this.walk(w,dt);this.work(w,dt);}
+    for(const w of s.settlers){w.moving=false;if(w.job?.kind==='unload-boat')this.release(w);if(w.job?.kind==='rest'&&timeOfDay(s.time)!=='Night')this.release(w);if(timeOfDay(s.time)==='Night'&&w.job&&!['rest','gather','deliver'].includes(w.job.kind)&&!w.cargo.animal&&!w.cargo.construction&&w.cargo.food+w.cargo.wood===0)this.release(w);if(w.job?.kind==='gather'&&(!evening(s.time)||s.food<s.settlers.length*3||s.orders.length>0||!s.plots.some(p=>p.id===w.job!.target&&p.valid&&p.stage==='complete')))this.release(w);if(w.stranded)continue;this.foodSystem.beforeWalk(w);this.walk(w,dt);this.work(w,dt);}
     this.prayers(dt);
   }
   private buildingMessage(p:WorldState['plots'][number]){
@@ -647,7 +669,7 @@ export class Settlement {
   status():SettlementStatus{
     const s=this.state,homes=s.plots.filter(p=>p.kind==='home'&&p.stage==='complete'&&p.valid).length;
     const farms=s.plots.filter(p=>p.kind==='farm'&&p.stage==='complete'&&p.valid).length;
-    const labels:Record<JobKind,string>={...FOOD_LABELS,gather:'Gathering by the bonfire',supply:'Carrying construction wood',wood:'Gathering wood',forage:'Foraging',build:'Building',plant:'Planting',harvest:'Harvesting',deliver:'Bringing supplies home', 'unload-boat':'Unloading fish at the dock',clear:'Making room for your building',rally:'Following your beacon',worship:'Worshipping at the temple',butcher:'Preparing meat for the village'};
+    const labels:Record<JobKind,string>={...FOOD_LABELS,rest:'Resting at home',gather:'Gathering by the bonfire',supply:'Carrying construction wood',wood:'Gathering wood',forage:'Foraging',build:'Building',plant:'Planting',harvest:'Harvesting',deliver:'Bringing supplies home', 'unload-boat':'Unloading fish at the dock',clear:'Making room for your building',rally:'Following your beacon',worship:'Worshipping at the temple',butcher:'Preparing meat for the village'};
     const guidance=[...s.orders.map(o=>({id:o.id,kind:o.kind,message:this.orderMessages.get(o.id)??'Waiting for followers',cancellable:true,progress:null as number|null})),...s.plots.filter(p=>p.guided&&p.stage==='building').map(p=>({id:p.id,kind:p.kind,message:this.buildingMessage(p),cancellable:false,progress:p.progress}))];
     const completedHomes=s.plots.filter(p=>p.kind==='home'&&p.stage==='complete'&&p.valid);
     const buildings=s.plots.map(p=>{

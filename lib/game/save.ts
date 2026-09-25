@@ -97,7 +97,7 @@ export function decodeSave(raw:string):IslandSave{
     if((w.cargo.harvest as number)>(w.cargo.food as number))fail();
     if(w.cargo.boatFish!==undefined&&(!finite(w.cargo.boatFish,0,20)||(w.cargo.boatFish as number)>(w.cargo.food as number)))fail();
     if(w.job!==null){
-      const j=w.job;if(!record(j)||![...FOOD_JOBS,'wood','forage','build','plant','harvest','deliver','unload-boat','clear','rally','worship','butcher','supply','gather'].includes(j.kind as string)||!integer(j.target)||!finite(j.work,0,1e6)||!Array.isArray(j.route)||j.route.length>40000||!j.route.every(point))fail();
+      const j=w.job;if(!record(j)||![...FOOD_JOBS,'wood','forage','build','plant','harvest','deliver','unload-boat','clear','rally','worship','butcher','supply','gather','rest'].includes(j.kind as string)||!integer(j.target)||!finite(j.work,0,1e6)||!Array.isArray(j.route)||j.route.length>40000||!j.route.every(point))fail();
     }
   }
   if(s.beacon!==null){
@@ -152,6 +152,7 @@ export function decodeSave(raw:string):IslandSave{
       const b=s.beacon;if(!record(b)||job.target!==b.id||!(b.members as Record<string,unknown>[]).some(m=>m.id===worker.id&&['walking','arrived'].includes(m.phase as string)))fail();continue;
     }
     if(job.kind==='gather'){if(!plots.some(v=>{const p=v as Record<string,unknown>;return p.id===job.target&&p.kind==='bonfire'&&p.stage==='complete'&&p.valid;}))fail();continue;}
+    if(job.kind==='rest'){if(!plots.some(v=>{const p=v as Record<string,unknown>;return p.id===job.target&&p.kind==='home'&&p.stage==='complete'&&p.valid;}))fail();continue;}
     if(job.kind==='clear'){if(!orders.some(o=>(o as Record<string,unknown>).id===job.target))fail();continue;}
     const list=job.kind==='wood'||job.kind==='forage'?resources:plots;
     const target=list.find(v=>(v as Record<string,unknown>).id===job.target) as Record<string,unknown>|undefined;

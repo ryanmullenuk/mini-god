@@ -109,10 +109,12 @@ export class FoodSystem {
   if((w.huntingSkill??0)>=1&&w.weapon){
    for(const t of this.f.traps.filter(t=>t.phase==='planned'))if(this.start(w,'trap-set',t.id,t))return true;
    const pen=this.pen('pig');if(pen)for(const t of this.f.traps.filter(t=>t.phase==='caught'))if(this.start(w,'trap-collect',t.id,t,pen.id))return true;
-   if(this.f.hunting.includes(w.id))for(const a of this.f.animals.filter(a=>a.alive&&a.species==='pig'&&a.claimedBy===null).sort((a,b)=>dist(w,a)-dist(w,b))){
+   for(const a of this.f.animals.filter(a=>a.alive&&a.species==='pig'&&a.claimedBy===null).sort((a,b)=>dist(w,a)-dist(w,b))){
     const d=dist(w,a),q=d<=4?w:{x:a.x+(w.x-a.x)/d*4,z:a.z+(w.z-a.z)/d*4};
     if(this.nav.segment(q,a)&&this.start(w,'hunt',a.id,q))return true;
    }
+   const openFish=this.f.fishing.find(a=>a.workerId===null&&a.claimedBy===null&&a.stock>0&&this.water(a.water));
+   if(openFish&&this.start(w,'fish',openFish.id,openFish))return true;
   }
   for(const p of this.s.plots.filter(p=>p.kind==='slaughterhouse'&&p.valid&&p.stage==='complete'&&((p.poultry??0)+(p.pork??0)>0)))if(this.start(w,'animal-process',p.id,entrance(p)))return true;
   return false;

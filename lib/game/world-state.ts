@@ -12,7 +12,7 @@ export type FishingArea = Point & {id:number;water:Point;stock:number;recovery:n
 export type PigTrap = Point & {id:number;phase:'planned'|'armed'|'caught'|'empty';claimedBy:number|null};
 export type FoodState = {initialized:boolean;animals:WildAnimal[];fishing:FishingArea[];traps:PigTrap[];training:number[];hunting:number[];seed:number};
 export const newFoodState=():FoodState=>({initialized:false,animals:[],fishing:[],traps:[],training:[],hunting:[],seed:68129});
-export type JobKind = FoodJob | 'wood' | 'forage' | 'build' | 'plant' | 'harvest' | 'deliver' | 'unload-boat' | 'clear' | 'rally' | 'worship' | 'butcher' | 'supply' | 'gather';
+export type JobKind = FoodJob | 'wood' | 'forage' | 'build' | 'plant' | 'harvest' | 'deliver' | 'unload-boat' | 'clear' | 'rally' | 'worship' | 'butcher' | 'supply' | 'gather' | 'rest';
 export type BuildKind = 'home' | 'farm' | 'dock' | 'temple' | 'slaughterhouse' | 'coop' | 'pigpen' | 'granary' | 'storehouse' | 'torch' | 'bonfire';
 export const BUILD_LABEL: Record<BuildKind,string> = {torch:'Tiki torch',bonfire:'Bonfire',home:'Hut',farm:'Farm',dock:'Dock',temple:'Temple',slaughterhouse:'Slaughterhouse',coop:'Chicken coop',pigpen:'Pig pen',granary:'Granary',storehouse:'Storehouse'};
 export const BUILD_TIME = {torch:8,bonfire:16,dock:28,granary:36,storehouse:32,home:24,farm:15,temple:48,slaughterhouse:36,coop:B.buildings.coop.seconds,pigpen:B.buildings.pigpen.seconds} as const;
